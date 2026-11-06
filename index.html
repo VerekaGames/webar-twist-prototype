@@ -50,7 +50,9 @@ a{color:inherit}
 .pool .bar i{display:block;height:100%;background:var(--cream);border-radius:3px;transition:width .6s}
 
 .stage-cookie{display:grid;place-items:center;flex:1;min-height:150px}
-.stage-cookie canvas{max-width:100%}
+.stage-cookie canvas,.stage-cookie img{max-width:100%;height:auto}
+.hero-img{animation:bob 3.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-3deg)}}
 
 .consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);line-height:1.4}
 .consent input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--cream)}
@@ -184,6 +186,7 @@ a{color:inherit}
     <p class="instr" id="instr">Pokaż dłoń</p>
     <p class="sub" id="sub">Chwyć ciastko kciukiem i palcem wskazującym, potem przekręć nadgarstek.</p>
     <button class="btn ghost small" id="touchMode">Kamera nie działa? Graj palcem</button>
+    <button class="btn ghost small" id="retryCam" hidden>Spróbuj ponownie z kamerą</button>
   </div>
   <div class="loader" id="loader"><div class="spin"></div><p class="sub" id="loaderText">Ładuję kamerę i śledzenie dłoni…</p></div>
 </section>
@@ -272,8 +275,8 @@ a{color:inherit}
 const CONFIG = {
   DAILY_POOL: 300,
   CODE_TTL_MIN: 30,
-  TWIST_TARGET_DEG: 120,      // skumulowany obrót nadgarstka potrzebny do odkręcenia
-  TOUCH_TARGET_DEG: 300,      // obrót palcem w trybie dotykowym
+  TWIST_TARGET_DEG: 75,       // skumulowany obrót nadgarstka potrzebny do odkręcenia
+  TOUCH_TARGET_DEG: 270,      // obrót palcem w trybie dotykowym
   MIN_SESSION_MS: 2000,       // antybot: minimalny czas od startu AR do rezerwacji
   NO_HAND_HINT_MS: 8000,      // po tylu ms bez dłoni podświetlamy tryb dotykowy
   MP: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14',
@@ -400,33 +403,40 @@ $('go').onclick = () => startAR();
 let THREE = null;
 async function loadThree(){ if (!THREE) THREE = await import(CONFIG.THREE); return THREE; }
 
-function waferTextures(T){
+/* tekstury rysowane raz i współdzielone (pewne ładowanie, mniej pamięci GPU) */
+let TEXCANVAS = null;
+function textureCanvases(){
+  if (TEXCANVAS) return TEXCANVAS;
   const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = '#2b1a13'; g.fillRect(0,0,S,S);
+  g.fillStyle = '#2a1812'; g.fillRect(0,0,S,S);
   g.translate(S/2, S/2);
   const ring = (r, n, size) => { for (let i=0;i<n;i++){ const a = i/n*Math.PI*2; g.beginPath(); g.arc(Math.cos(a)*r, Math.sin(a)*r, size, 0, Math.PI*2); g.fill(); } };
-  g.fillStyle = '#5a3b2c';
-  ring(232, 40, 9);
-  g.strokeStyle = '#4e3326'; g.lineWidth = 10;
-  g.beginPath(); g.arc(0,0,205,0,Math.PI*2); g.stroke();
-  for (let i=0;i<12;i++){ g.save(); g.rotate(i/12*Math.PI*2); g.beginPath(); g.ellipse(0,-140,22,48,0,0,Math.PI*2); g.fillStyle = '#4e3326'; g.fill(); g.restore(); }
-  g.beginPath(); g.arc(0,0,82,0,Math.PI*2); g.lineWidth = 12; g.stroke();
-  g.fillStyle = '#5a3b2c'; ring(46, 8, 10);
-  g.beginPath(); g.arc(0,0,16,0,Math.PI*2); g.fill();
-  const top = new T.CanvasTexture(c); top.colorSpace = T.SRGBColorSpace;
-
+  const raised = '#74503b', mid = '#5f3f2e';
+  g.fillStyle = raised; ring(232, 40, 9);
+  g.strokeStyle = mid; g.lineWidth = 10; g.beginPath(); g.arc(0,0,205,0,Math.PI*2); g.stroke();
+  g.fillStyle = raised;
+  for (let i=0;i<12;i++){ g.save(); g.rotate(i/12*Math.PI*2); g.beginPath(); g.ellipse(0,-140,22,48,0,0,Math.PI*2); g.fill(); g.restore(); }
+  g.strokeStyle = raised; g.lineWidth = 12; g.beginPath(); g.arc(0,0,82,0,Math.PI*2); g.stroke();
+  ring(46, 8, 10); g.beginPath(); g.arc(0,0,16,0,Math.PI*2); g.fill();
   const sc = document.createElement('canvas'); sc.width = 512; sc.height = 32;
-  const sg = sc.getContext('2d'); sg.fillStyle = '#2b1a13'; sg.fillRect(0,0,512,32);
-  sg.fillStyle = '#47301f'; for (let x=0;x<512;x+=8) sg.fillRect(x,0,3,32);
-  const side = new T.CanvasTexture(sc); side.colorSpace = T.SRGBColorSpace; side.wrapS = T.RepeatWrapping; side.repeat.x = 4;
-  return { top, side, bump: new T.CanvasTexture(c) };
+  const sg = sc.getContext('2d'); sg.fillStyle = '#2a1812'; sg.fillRect(0,0,512,32);
+  sg.fillStyle = '#5a3a28'; for (let x=0;x<512;x+=8) sg.fillRect(x,0,3,32);
+  return TEXCANVAS = { face: c, side: sc };
+}
+function waferTextures(T, renderer){
+  const cv = textureCanvases();
+  const aniso = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
+  const top = new T.CanvasTexture(cv.face); top.colorSpace = T.SRGBColorSpace; top.anisotropy = aniso; top.needsUpdate = true;
+  const bump = new T.CanvasTexture(cv.face); bump.needsUpdate = true;
+  const side = new T.CanvasTexture(cv.side); side.colorSpace = T.SRGBColorSpace; side.wrapS = T.RepeatWrapping; side.repeat.x = 4; side.needsUpdate = true;
+  return { top, side, bump };
 }
 
-function makeCookie(T){
-  const tex = waferTextures(T);
+function makeCookie(T, renderer){
+  const tex = waferTextures(T, renderer);
   const sideM = new T.MeshStandardMaterial({ map: tex.side, roughness: .85, metalness: 0 });
-  const topM = new T.MeshStandardMaterial({ map: tex.top, bumpMap: tex.bump, bumpScale: 2.5, roughness: .8 });
+  const topM = new T.MeshStandardMaterial({ map: tex.top, bumpMap: tex.bump, bumpScale: 3, roughness: .75 });
   const waferGeo = new T.CylinderGeometry(1, 1, .3, 72);
   const creamGeo = new T.CylinderGeometry(.9, .9, .22, 72);
   const creamM = new T.MeshStandardMaterial({ color: 0xfaf4e6, roughness: .55 });
@@ -437,7 +447,7 @@ function makeCookie(T){
   const top = new T.Mesh(waferGeo, [sideM, topM, topM]);
   topPivot.add(top);
   group.add(bottom, cream, topPivot);
-  return { group, topPivot, bottom, cream };
+  return { group, topPivot, bottom, cream, textures: Object.values(tex) };
 }
 
 function makeCrumbs(T){
@@ -449,20 +459,24 @@ function makeCrumbs(T){
   return { pts, vel, n, t: -1 };
 }
 
-/* małe ciastko na landingu */
+/* ciastko na landingu: renderujemy raz do obrazka i zwalniamy WebGL,
+   żeby na stronie był tylko jeden kontekst (AR) – telefony gubią tekstury przy kilku */
 (async function heroCookie(){
+  const cv = $('heroCookie');
   try {
     const T = await loadThree();
-    const cv = $('heroCookie');
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
     r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.setSize(260, 200, false);
     const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 260/200, .1, 50); cam.position.set(0,0,7);
     scene.add(new T.HemisphereLight(0xffffff, 0x223377, 1.6));
-    const d = new T.DirectionalLight(0xffffff, 2.2); d.position.set(2,4,5); scene.add(d);
-    const ck = makeCookie(T); ck.group.rotation.x = .9; ck.group.scale.setScalar(1.25); scene.add(ck.group);
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    (function loop(t){ if (!$('start').hidden) { ck.group.rotation.z = Math.sin(t/1400)*.15; ck.topPivot.rotation.y = reduce ? 0 : Math.sin(t/900)*.5; ck.topPivot.position.y = .26 + Math.max(0, Math.sin(t/900))*.08; r.render(scene, cam); } requestAnimationFrame(loop); })(0);
-  } catch (e) { $('heroCookie').hidden = true; }
+    const d = new T.DirectionalLight(0xffffff, 2.4); d.position.set(2,4,5); scene.add(d);
+    const ck = makeCookie(T, r); ck.group.rotation.set(.9, 0, -.12); ck.group.scale.setScalar(1.25);
+    ck.topPivot.position.y = .36; ck.topPivot.rotation.y = .4; scene.add(ck.group);
+    r.render(scene, cam);
+    const img = new Image(); img.src = cv.toDataURL('image/png'); img.alt = ''; img.className = 'hero-img'; img.width = 260; img.height = 200;
+    cv.replaceWith(img);
+    ck.textures.forEach(t => t.dispose()); r.dispose(); r.forceContextLoss();
+  } catch (e) { cv.hidden = true; }
 })();
 
 /* =====================================================================
@@ -472,7 +486,8 @@ const AR = {
   running:false, facing:'environment', stream:null, landmarker:null, mode:'camera',
   renderer:null, scene:null, cam:null, cookie:null, crumbs:null,
   W:0, H:0, net:0, prevAngle:null, smoothAngle:null, lastHandAt:0, startedAt:0, nonce:'',
-  target:{x:0,y:0,s:110}, cur:{x:0,y:0,s:110}, done:false, frames:0, fpsT:0, fps:0, lastVideoTime:-1
+  target:{x:0,y:0,s:110}, cur:{x:0,y:0,s:110}, done:false, frames:0, fpsT:0, fps:0, lastVideoTime:-1,
+  roll:{prev:null, net:0, sm:null}, pron:{prev:null, net:0, sm:null}, lastFrameAt:0, restarts:0, loopToken:0, starting:false
 };
 const C = 2*Math.PI*27;
 $('ringFg').style.strokeDasharray = C;
@@ -486,51 +501,91 @@ function setProgress(p){
 function setInstr(a, b){ $('instr').textContent = a; if (b !== undefined) $('sub').textContent = b; }
 
 async function startAR(){
+  if (AR.starting) return;                 // podwójne kliknięcie
+  AR.starting = true;
   show('ar');
-  $('loader').hidden = false;
+  $('loader').hidden = false; $('loaderText').textContent = 'Ładuję kamerę i śledzenie dłoni…';
   Object.assign(AR, { running:true, done:false, net:0, prevAngle:null, smoothAngle:null, startedAt:performance.now(),
-    nonce: (crypto.randomUUID ? crypto.randomUUID() : String(Math.random())), lastHandAt: performance.now() });
+    nonce: (crypto.randomUUID ? crypto.randomUUID() : String(Math.random())), lastHandAt: performance.now(), restarts:0 });
+  resetTwist();
   setProgress(0);
   try { await loadThree(); initScene(); }
-  catch(e){ $('loaderText').textContent = 'Nie udało się załadować grafiki 3D. Sprawdź połączenie i spróbuj ponownie.'; return; }
+  catch(e){ $('loaderText').textContent = 'Nie udało się załadować grafiki 3D. Sprawdź połączenie i odśwież stronę.'; AR.starting = false; return; }
 
-  let camOk = false;
-  try { await startCamera(); camOk = true; }
-  catch(e){ console.warn('camera', e); }
-
-  if (camOk) {
-    $('loaderText').textContent = 'Ładuję śledzenie dłoni…';
-    try { await loadLandmarker(); }
-    catch(e){ console.warn('mediapipe', e); camOk = false; stopCamera(); }
-  }
+  // kamera i model ładujemy równolegle – szybszy start
+  const camP = startCamera().then(() => null, e => e);
+  const mpP = loadLandmarker().then(() => null, e => e);
+  const camErr = await camP;
+  let mpErr = null;
+  if (!camErr) { $('loaderText').textContent = 'Ładuję śledzenie dłoni…'; mpErr = await mpP; }
   $('loader').hidden = true;
-  if (camOk) enterCameraMode(); else enterTouchMode('Kamera niedostępna – odkręć ciastko palcem.');
-  requestAnimationFrame(loop);
+  if (!camErr && !mpErr) enterCameraMode();
+  else {
+    if (camErr) console.warn('camera', camErr); if (mpErr) console.warn('mediapipe', mpErr);
+    enterTouchMode(camErr ? camMessage(camErr) : 'Nie udało się załadować śledzenia dłoni. Sprawdź internet albo graj palcem.', true);
+  }
+  const token = ++AR.loopToken;            // jedna pętla na raz
+  requestAnimationFrame(t => loop(t, token));
+  AR.starting = false;
 }
+
+function camMessage(e){
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError') return 'Brak zgody na kamerę. Zezwól na nią w pasku adresu i spróbuj ponownie.';
+  if (n === 'NotReadableError' || n === 'AbortError') return 'Kamera jest zajęta (np. przez Teams, Zoom lub inną kartę). Zamknij ją i spróbuj ponownie.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Nie znaleziono kamery. Podłącz kamerkę i spróbuj ponownie.';
+  if (e && e.message === 'timeout') return 'Kamera nie przesyła obrazu. Spróbuj ponownie albo wybierz inną kamerę.';
+  return 'Kamera niedostępna – odkręć ciastko palcem.';
+}
+function resetTwist(){ AR.net = 0; AR.roll = {prev:null, net:0, sm:null}; AR.pron = {prev:null, net:0, sm:null}; AR.prevAngle = null; }
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(UA));
 AR.deviceId = store.get('oreoProto.cam') || null;
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function getStream(video){
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try { return await navigator.mediaDevices.getUserMedia({ audio:false, video }); }
+    catch (e) {
+      last = e;
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e;   // brak zgody – nie ponawiamy
+      await sleep(400 * (i + 1));                                                // kamera jeszcze zwalniana
+    }
+  }
+  throw last;
+}
 async function startCamera(){
   stopCamera();
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('no getUserMedia');
-  const size = { width:{ideal:1280}, height:{ideal:720} };
-  const video = AR.deviceId ? { deviceId:{ exact: AR.deviceId }, ...size }
-              : IS_MOBILE ? { facingMode: AR.facing, ...size } : size;
-  try { AR.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video }); }
+  await sleep(150);                        // daj sterownikowi zwolnić poprzedni strumień
+  if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('no getUserMedia'), { name:'NotFoundError' });
+  const size = IS_MOBILE ? { width:{ideal:1280}, height:{ideal:720} } : { width:{ideal:960}, height:{ideal:540} };
+  const generic = IS_MOBILE ? { facingMode: AR.facing, ...size } : size;
+  try { AR.stream = await getStream(AR.deviceId ? { deviceId:{ exact: AR.deviceId }, ...size } : generic); }
   catch (e) {
-    if (!AR.deviceId) throw e;
+    if (!AR.deviceId || e.name === 'NotAllowedError') throw e;
     AR.deviceId = null; store.set('oreoProto.cam', null);              // zapamiętana kamera zniknęła
-    AR.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video: IS_MOBILE ? { facingMode: AR.facing, ...size } : size });
+    AR.stream = await getStream(generic);
   }
   const track = AR.stream.getVideoTracks()[0], st = track.getSettings ? track.getSettings() : {};
-  // lustro: kamera przednia telefonu albo kamerka komputera
-  AR.mirror = st.facingMode ? st.facingMode === 'user' : !IS_MOBILE;
+  AR.mirror = st.facingMode ? st.facingMode === 'user' : !IS_MOBILE;   // przednia / kamerka komputera = lustro
   if (st.deviceId) AR.activeDeviceId = st.deviceId;
+  track.onended = () => { if (AR.running && AR.mode === 'camera') restartCamera('Kamera się rozłączyła – łączę ponownie…'); };
   const v = $('video'); v.srcObject = AR.stream; v.classList.toggle('mirror', AR.mirror);
-  await v.play();
-  await new Promise(r => v.readyState >= 2 ? r() : v.onloadeddata = r);
+  try { await v.play(); } catch (e) { if (e.name !== 'AbortError') throw e; }
+  await Promise.race([
+    new Promise(r => { const ok = () => v.videoWidth > 0 ? r() : requestAnimationFrame(ok); ok(); }),
+    sleep(5000).then(() => { throw new Error('timeout'); })
+  ]);
+  AR.lastFrameAt = performance.now(); AR.lastVideoTime = -1;
   fillCameraList();
+}
+async function restartCamera(msg){
+  if (AR.restarting) return; AR.restarting = true;
+  setStatus(msg || 'Łączę z kamerą…', false);
+  try { await startCamera(); AR.restarts++; }
+  catch (e) { enterTouchMode(camMessage(e), true); }
+  AR.restarting = false;
 }
 
 async function fillCameraList(){
@@ -546,31 +601,37 @@ async function fillCameraList(){
 }
 $('camSel').onchange = async e => {
   AR.deviceId = e.target.value; store.set('oreoProto.cam', AR.deviceId);
-  try { await startCamera(); toast('Zmieniono kamerę'); } catch { toast('Nie udało się włączyć tej kamery'); }
+  try { await startCamera(); toast('Zmieniono kamerę'); } catch (err) { toast('Nie udało się włączyć tej kamery'); enterTouchMode(camMessage(err), true); }
 };
-function stopCamera(){ if (AR.stream) { AR.stream.getTracks().forEach(t => t.stop()); AR.stream = null; } $('video').srcObject = null; }
+function stopCamera(){ if (AR.stream) { AR.stream.getTracks().forEach(t => { t.onended = null; t.stop(); }); AR.stream = null; } const v = $('video'); try { v.pause(); } catch {} v.srcObject = null; }
 
 async function loadLandmarker(){
   if (AR.landmarker) return;
+  if (AR.lmPromise) return AR.lmPromise;
+  AR.lmPromise = (async () => {
   const vision = await import(`${CONFIG.MP}/vision_bundle.mjs`);
   const fileset = await vision.FilesetResolver.forVisionTasks(`${CONFIG.MP}/wasm`);
   const opts = d => ({ baseOptions:{ modelAssetPath: CONFIG.MODEL, delegate: d }, runningMode:'VIDEO', numHands:1,
-    minHandDetectionConfidence:.5, minHandPresenceConfidence:.5, minTrackingConfidence:.5 });
+    minHandDetectionConfidence:.4, minHandPresenceConfidence:.4, minTrackingConfidence:.4 });
   try { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('GPU')); AR.delegate = 'GPU'; }
   catch { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('CPU')); AR.delegate = 'CPU'; }
+  })();
+  try { await AR.lmPromise; } finally { if (!AR.landmarker) AR.lmPromise = null; }
 }
 
 function enterCameraMode(){
   AR.mode = 'camera';
   $('video').hidden = false; $('backdrop').hidden = true;
-  $('touchMode').hidden = false;
+  $('touchMode').hidden = false; $('retryCam').hidden = true;
+  resetTwist();
   fillCameraList();
   $('lm').hidden = !TEST.landmarks;
   setStatus('Szukam dłoni', false);
   setInstr('Pokaż dłoń', 'Chwyć ciastko kciukiem i palcem wskazującym, potem przekręć nadgarstek.');
 }
-function enterTouchMode(msg){
-  AR.mode = 'touch'; AR.net = 0; AR.prevAngle = null; setProgress(0);
+function enterTouchMode(msg, canRetry){
+  AR.mode = 'touch'; resetTwist(); setProgress(0);
+  $('retryCam').hidden = !canRetry;
   stopCamera();
   $('video').hidden = true; $('backdrop').hidden = false;
   $('touchMode').hidden = true; $('flip').hidden = true; $('camSel').hidden = true; $('lm').hidden = true;
@@ -579,13 +640,20 @@ function enterTouchMode(msg){
   setInstr('Kręć palcem', msg || 'Kręć palcem dookoła ciastka, aby je odkręcić.');
   AR.target = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
 }
-$('touchMode').onclick = () => enterTouchMode();
+$('touchMode').onclick = () => enterTouchMode(undefined, true);
+$('retryCam').onclick = async () => {
+  $('retryCam').hidden = true; $('loader').hidden = false; $('loaderText').textContent = 'Łączę z kamerą…';
+  const camErr = await startCamera().then(() => null, e => e);
+  const mpErr = camErr ? null : await loadLandmarker().then(() => null, e => e);
+  $('loader').hidden = true;
+  if (!camErr && !mpErr) enterCameraMode(); else enterTouchMode(camErr ? camMessage(camErr) : 'Nie udało się załadować śledzenia dłoni.', true);
+};
 $('flip').onclick = async () => {
   AR.facing = AR.facing === 'environment' ? 'user' : 'environment';
   AR.deviceId = null; store.set('oreoProto.cam', null);
-  try { await startCamera(); } catch { enterTouchMode('Nie udało się przełączyć kamery – graj palcem.'); }
+  try { await startCamera(); } catch (e) { enterTouchMode(camMessage(e), true); }
 };
-$('close').onclick = () => { AR.running = false; stopCamera(); enterStart(); };
+$('close').onclick = () => { AR.running = false; AR.loopToken++; stopCamera(); enterStart(); };
 
 function initScene(){
   const T = THREE, cv = $('gl');
@@ -595,7 +663,9 @@ function initScene(){
     AR.scene = new T.Scene();
     AR.scene.add(new T.HemisphereLight(0xffffff, 0x334488, 1.5));
     const d = new T.DirectionalLight(0xffffff, 2.4); d.position.set(.4, 1, 1.2); AR.scene.add(d);
-    AR.cookie = makeCookie(T); AR.scene.add(AR.cookie.group);
+    AR.cookie = makeCookie(T, AR.renderer); AR.scene.add(AR.cookie.group);
+    cv.addEventListener('webglcontextlost', e => e.preventDefault());
+    cv.addEventListener('webglcontextrestored', () => AR.cookie.textures.forEach(t => t.needsUpdate = true));
     AR.crumbs = makeCrumbs(T); AR.scene.add(AR.crumbs.pts);
     addEventListener('resize', resize);
     bindTouch(cv);
@@ -624,35 +694,60 @@ function toScreen(nx, ny){
 }
 const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
 
-/* akumulacja obrotu – wspólna dla dłoni i palca */
+/* akumulacja obrotu (tryb dotykowy) */
 function accumulate(angle, maxStep){
   if (AR.prevAngle === null) { AR.prevAngle = angle; return; }
   let d = wrap(angle - AR.prevAngle); AR.prevAngle = angle;
-  if (Math.abs(d) > maxStep || Math.abs(d) < .003) return;   // skoki trackera i drgania
+  if (Math.abs(d) > maxStep || Math.abs(d) < .002) return;
   AR.net += d;
+}
+/* jeden kanał obrotu dłoni: wygładzanie + sumowanie zmian kąta */
+function track(ch, raw, maxStep){
+  if (raw === null) { ch.prev = null; ch.sm = null; return; }
+  ch.sm = ch.sm === null ? raw : ch.sm + wrap(raw - ch.sm)*0.7;
+  if (ch.prev === null) { ch.prev = ch.sm; return; }
+  const d = wrap(ch.sm - ch.prev); ch.prev = ch.sm;
+  if (Math.abs(d) > maxStep || Math.abs(d) < .002) return;
+  ch.net += d;
+}
+/* obrót wokół osi dłoni (pronacja/supinacja, jak przy odkręcaniu słoika) z punktów 3D */
+function pronationAngle(w){
+  const sub = (a,b) => [a.x-b.x, a.y-b.y, a.z-b.z];
+  const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const norm = a => { const l = Math.hypot(a[0],a[1],a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+  const ax = norm(sub(w[9], w[0]));                       // nadgarstek -> podstawa środkowego palca
+  if (Math.abs(ax[2]) > .9) return null;                  // dłoń skierowana prosto w kamerę – brak odniesienia
+  const v0 = sub(w[17], w[5]), k = dot(v0, ax);
+  const v = [v0[0]-ax[0]*k, v0[1]-ax[1]*k, v0[2]-ax[2]*k];
+  const r = norm([-ax[0]*ax[2], -ax[1]*ax[2], 1-ax[2]*ax[2]]);   // oś kamery Z rzutowana na płaszczyznę
+  const r2 = [ax[1]*r[2]-ax[2]*r[1], ax[2]*r[0]-ax[0]*r[2], ax[0]*r[1]-ax[1]*r[0]];
+  return Math.atan2(dot(v, r2), dot(v, r));
 }
 
 function processHand(res, now){
   const lm = res.landmarks && res.landmarks[0];
+  const wl = res.worldLandmarks && res.worldLandmarks[0];
   if (!lm) {
     if (TEST.landmarks) clearLandmarks();
-    if (now - AR.lastHandAt > 700) { AR.net *= .96; AR.prevAngle = null; AR.smoothAngle = null; setStatus('Szukam dłoni', false); }
-    if (now - AR.lastHandAt > CONFIG.NO_HAND_HINT_MS) setInstr('Nie widzę dłoni', 'Dodaj światła i pokaż całą dłoń – albo graj palcem.');
+    const lost = now - AR.lastHandAt;
+    if (lost > 250) { track(AR.roll, null); track(AR.pron, null); }
+    if (lost > 1500) { AR.roll.net *= .985; AR.pron.net *= .985; setStatus('Szukam dłoni', false); }
+    AR.net = Math.abs(AR.roll.net) >= Math.abs(AR.pron.net) ? AR.roll.net : AR.pron.net;
+    if (lost > CONFIG.NO_HAND_HINT_MS) setInstr('Nie widzę dłoni', 'Dodaj światła i pokaż całą dłoń – albo graj palcem.');
     return;
   }
   AR.lastHandAt = now;
   setStatus('Dłoń wykryta', true);
   const p = k => toScreen(lm[k].x, lm[k].y);
-  if (TEST.landmarks) drawLandmarks(lm.map((_, i) => p(i)));
   const w = p(0), m9 = p(9), th = p(4), ix = p(8), a5 = p(5), a17 = p(17);
   const handPx = Math.hypot(m9.x - w.x, m9.y - w.y);
-  // ciastko między kciukiem a palcem wskazującym
   AR.target = { x: (th.x + ix.x)/2, y: (th.y + ix.y)/2, s: Math.max(48, Math.min(170, handPx*0.62)) };
-  // kąt przechylenia dłoni = linia podstaw palców wskazującego i małego
-  const raw = Math.atan2(a17.y - a5.y, a17.x - a5.x);
-  if (AR.smoothAngle === null) AR.smoothAngle = raw;
-  AR.smoothAngle = AR.smoothAngle + wrap(raw - AR.smoothAngle)*0.5;
-  accumulate(AR.smoothAngle, 0.6);
+  // dwa kanały: obrót w płaszczyźnie ekranu + obrót wokół osi dłoni; liczy się większy
+  const mirrorSign = AR.mirror ? -1 : 1;
+  track(AR.roll, Math.atan2(a17.y - a5.y, a17.x - a5.x), 1.0);
+  track(AR.pron, wl ? pronationAngle(wl) : null, 1.0);
+  AR.net = Math.abs(AR.roll.net) >= Math.abs(AR.pron.net) ? AR.roll.net : AR.pron.net*mirrorSign;
+  if (TEST.landmarks) drawLandmarks(lm.map((_, i) => p(i)));
   const prog = Math.abs(AR.net) / (CONFIG.TWIST_TARGET_DEG*Math.PI/180);
   if (prog < .08) setInstr('Chwyć i przekręć', 'Obróć nadgarstek jak przy odkręcaniu słoika.');
   else if (prog < 1) setInstr('Kręć dalej!', 'Jeszcze trochę…');
@@ -667,7 +762,8 @@ function drawLandmarks(pts){
   BONES.forEach(([a,b]) => { g.beginPath(); g.moveTo(pts[a].x, pts[a].y); g.lineTo(pts[b].x, pts[b].y); g.stroke(); });
   pts.forEach((q, i) => { g.beginPath(); g.arc(q.x, q.y, i === 5 || i === 17 ? 6 : 3.5, 0, Math.PI*2); g.fillStyle = i === 5 || i === 17 ? '#ffcf4a' : '#fff'; g.fill(); });
   g.strokeStyle = '#ffcf4a'; g.lineWidth = 3; g.beginPath(); g.moveTo(pts[5].x, pts[5].y); g.lineTo(pts[17].x, pts[17].y); g.stroke();
-  g.fillStyle = '#fff'; g.font = '600 13px system-ui'; g.fillText(`obrót: ${Math.round(Math.abs(AR.net)*180/Math.PI)}° / ${CONFIG.TWIST_TARGET_DEG}°`, 16, AR.H - 190);
+  g.fillStyle = '#fff'; g.font = '600 13px system-ui'; const deg = x => Math.round(Math.abs(x)*180/Math.PI);
+  g.fillText(`obrót: ${deg(AR.net)}° / ${CONFIG.TWIST_TARGET_DEG}°  (ekran ${deg(AR.roll.net)}°, nadgarstek ${deg(AR.pron.net)}°)`, 16, AR.H - 230);
 }
 function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
 
@@ -682,17 +778,19 @@ function bindTouch(cv){
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 
-function loop(now){
-  if (!AR.running) return;
+function loop(now, token){
+  if (!AR.running || token !== AR.loopToken) return;
   // śledzenie dłoni
   if (AR.mode === 'camera' && AR.landmarker && !AR.done) {
     const v = $('video');
-    if (v.readyState >= 2 && v.currentTime !== AR.lastVideoTime) {
-      AR.lastVideoTime = v.currentTime;
+    if (v.readyState >= 2 && v.videoWidth > 0 && v.currentTime !== AR.lastVideoTime) {
+      AR.lastVideoTime = v.currentTime; AR.lastFrameAt = now;
       try { processHand(AR.landmarker.detectForVideo(v, now), now); } catch(e){ console.warn(e); }
       AR.frames++;
     }
     if (now - AR.fpsT > 1000) { AR.fps = AR.frames; AR.frames = 0; AR.fpsT = now; }
+    // watchdog: obraz z kamery stanął na >3 s -> ponowne połączenie (maks. 3 razy)
+    if (now - AR.lastFrameAt > 3000 && !AR.restarting && AR.restarts < 3) restartCamera('Obraz stanął – łączę ponownie…');
   }
   const target = (AR.mode === 'touch' ? CONFIG.TOUCH_TARGET_DEG : CONFIG.TWIST_TARGET_DEG) * Math.PI/180;
   const prog = Math.min(1, Math.abs(AR.net)/target);
@@ -700,7 +798,7 @@ function loop(now){
   if (!AR.done && prog >= 1) win();
 
   // pozycja ciastka (wygładzona)
-  const k = AR.mode === 'camera' ? .35 : .2;
+  const k = AR.mode === 'camera' ? .5 : .25;
   AR.cur.x += (AR.target.x - AR.cur.x)*k; AR.cur.y += (AR.target.y - AR.cur.y)*k; AR.cur.s += (AR.target.s - AR.cur.s)*k;
   const ck = AR.cookie, g = ck.group;
   g.position.set(AR.cur.x - AR.W/2, AR.H/2 - AR.cur.y, 0);
@@ -729,7 +827,7 @@ function loop(now){
     cr.pts.material.opacity = Math.max(0, 1 - cr.t/1.2);
   }
   AR.renderer.render(AR.scene, AR.cam);
-  requestAnimationFrame(loop);
+  requestAnimationFrame(t => loop(t, token));
 }
 
 async function win(){
@@ -742,7 +840,7 @@ async function win(){
     CodeService.reserve({ nonce: AR.nonce, startedAt: Date.now() - (performance.now() - AR.startedAt) }),
     new Promise(r => setTimeout(r, 1100))
   ]);
-  AR.running = false; stopCamera();
+  AR.running = false; AR.loopToken++; stopCamera();
   if (res.ok) showSuccess(res, res.reused);
   else if (res.error === 'sold_out') { show('soldout'); }
   else { toast('Za szybko – spróbuj jeszcze raz'); startAR(); }
