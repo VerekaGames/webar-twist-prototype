@@ -188,7 +188,9 @@ a{color:inherit}
     <button class="btn ghost small" id="touchMode">Kamera nie działa? Graj palcem</button>
     <button class="btn ghost small" id="retryCam" hidden>Spróbuj ponownie z kamerą</button>
   </div>
-  <div class="loader" id="loader"><div class="spin"></div><p class="sub" id="loaderText">Ładuję kamerę i śledzenie dłoni…</p></div>
+  <div class="loader" id="loader"><div class="spin"></div><p class="sub" id="loaderText">Ładuję kamerę i śledzenie dłoni…</p>
+    <p class="sub" id="loaderHint" hidden>Jeśli przeglądarka pyta o zgodę na kamerę, zezwól na nią. Na komputerze okienko bywa schowane pod ikoną kamery w pasku adresu.</p>
+    <button class="btn ghost small" id="loaderSkip" hidden style="margin:0 auto">Graj bez kamery</button></div>
 </section>
 
 <!-- 4. SUKCES -->
@@ -487,7 +489,7 @@ const AR = {
   renderer:null, scene:null, cam:null, cookie:null, crumbs:null,
   W:0, H:0, net:0, prevAngle:null, smoothAngle:null, lastHandAt:0, startedAt:0, nonce:'',
   target:{x:0,y:0,s:110}, cur:{x:0,y:0,s:110}, done:false, frames:0, fpsT:0, fps:0, lastVideoTime:-1,
-  ch:{}, lastFrameAt:0, restarts:0, loopToken:0, starting:false
+  ch:{}, lastFrameAt:0, restarts:0, loopToken:0, starting:false, gen:0
 };
 const C = 2*Math.PI*27;
 $('ringFg').style.strokeDasharray = C;
@@ -500,41 +502,60 @@ function setProgress(p){
 }
 function setInstr(a, b){ $('instr').textContent = a; if (b !== undefined) $('sub').textContent = b; }
 
+function showLoader(text){
+  $('loader').hidden = false; $('loaderText').textContent = text;
+  $('loaderHint').hidden = true; $('loaderSkip').hidden = true;
+  clearTimeout(AR.loaderT);
+  AR.loaderT = setTimeout(() => { $('loaderHint').hidden = false; $('loaderSkip').hidden = false; }, 4000);
+}
+function hideLoader(){ clearTimeout(AR.loaderT); $('loader').hidden = true; }
+
+/* kamera + model z limitami czasu; zwraca null albo błąd */
+async function connectCamera(){
+  let stream = null;
+  const camErr = await startCamera().then(st => { stream = st; return null; }, e => e);
+  if (camErr) return { camErr };
+  $('loaderText').textContent = 'Ładuję śledzenie dłoni…';
+  const mpErr = await withTimeout(loadLandmarker(), 25000).then(() => null, e => e);
+  return { mpErr, stream };
+}
+function applyConnect(gen, r){
+  if (gen !== AR.gen) {                    // ktoś w międzyczasie wybrał grę bez kamery
+    if (r.stream && r.stream === AR.stream && AR.mode !== 'camera') stopCamera();
+    return;
+  }
+  hideLoader();
+  if (!r.camErr && !r.mpErr) { enterCameraMode(); return; }
+  if (r.camErr) console.warn('camera', r.camErr); if (r.mpErr) console.warn('mediapipe', r.mpErr);
+  enterTouchMode(r.camErr ? camMessage(r.camErr)
+    : (r.mpErr && r.mpErr.name === 'TimeoutError' ? 'Śledzenie dłoni ładuje się zbyt długo – sprawdź internet albo graj palcem.' : 'Nie udało się załadować śledzenia dłoni. Sprawdź internet albo graj palcem.'), true);
+}
+
 async function startAR(){
   if (AR.starting) return;                 // podwójne kliknięcie
   AR.starting = true;
   show('ar');
-  $('loader').hidden = false; $('loaderText').textContent = 'Ładuję kamerę i śledzenie dłoni…';
-  Object.assign(AR, { running:true, done:false, net:0, prevAngle:null, smoothAngle:null, startedAt:performance.now(),
+  showLoader('Ładuję kamerę i śledzenie dłoni…');
+  Object.assign(AR, { running:true, done:false, mode:'loading', startedAt:performance.now(),
     nonce: (crypto.randomUUID ? crypto.randomUUID() : String(Math.random())), lastHandAt: performance.now(), restarts:0 });
   resetTwist();
   setProgress(0);
   try { await loadThree(); initScene(); }
   catch(e){ $('loaderText').textContent = 'Nie udało się załadować grafiki 3D. Sprawdź połączenie i odśwież stronę.'; AR.starting = false; return; }
-
-  // kamera i model ładujemy równolegle – szybszy start
-  const camP = startCamera().then(() => null, e => e);
-  const mpP = loadLandmarker().then(() => null, e => e);
-  const camErr = await camP;
-  let mpErr = null;
-  if (!camErr) { $('loaderText').textContent = 'Ładuję śledzenie dłoni…'; mpErr = await mpP; }
-  $('loader').hidden = true;
-  if (!camErr && !mpErr) enterCameraMode();
-  else {
-    if (camErr) console.warn('camera', camErr); if (mpErr) console.warn('mediapipe', mpErr);
-    enterTouchMode(camErr ? camMessage(camErr) : 'Nie udało się załadować śledzenia dłoni. Sprawdź internet albo graj palcem.', true);
-  }
-  const token = ++AR.loopToken;            // jedna pętla na raz
+  const token = ++AR.loopToken;            // jedna pętla na raz, rusza od razu
   requestAnimationFrame(t => loop(t, token));
   AR.starting = false;
+  const gen = ++AR.gen;
+  applyConnect(gen, await connectCamera());
 }
+$('loaderSkip').onclick = () => { AR.gen++; hideLoader(); enterTouchMode(undefined, true); };
 
 function camMessage(e){
   const n = e && e.name;
   if (n === 'NotAllowedError' || n === 'SecurityError') return 'Brak zgody na kamerę. Zezwól na nią w pasku adresu i spróbuj ponownie.';
   if (n === 'NotReadableError' || n === 'AbortError') return 'Kamera jest zajęta (np. przez Teams, Zoom lub inną kartę). Zamknij ją i spróbuj ponownie.';
   if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Nie znaleziono kamery. Podłącz kamerkę i spróbuj ponownie.';
-  if (e && e.message === 'timeout') return 'Kamera nie przesyła obrazu. Spróbuj ponownie albo wybierz inną kamerę.';
+  if (e && (e.message === 'timeout' || n === 'TimeoutError')) return 'Kamera nie odpowiada. Sprawdź, czy przeglądarka nie czeka na zgodę (ikona kamery w pasku adresu), i spróbuj ponownie.';
   return 'Kamera niedostępna – odkręć ciastko palcem.';
 }
 const CHANNELS = ['roll','grip','knob','pron'];
@@ -544,19 +565,36 @@ const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoi
 AR.deviceId = store.get('oreoProto.cam') || null;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+/* limit czasu; wynik, który przyjdzie po czasie, sprzątamy (np. zatrzymujemy strumień) */
+function withTimeout(p, ms, onLate){
+  let settled = false;
+  return Promise.race([
+    p.then(v => { if (settled) { onLate && onLate(v); return v; } settled = true; return v; },
+           e => { if (!settled) { settled = true; throw e; } }),
+    sleep(ms).then(() => { if (!settled) { settled = true; throw Object.assign(new Error('timeout'), { name:'TimeoutError' }); } })
+  ]);
+}
+const stopTracks = st => { try { st.getTracks().forEach(t => t.stop()); } catch {} };
 async function getStream(video){
   let last;
   for (let i = 0; i < 3; i++) {
-    try { return await navigator.mediaDevices.getUserMedia({ audio:false, video }); }
+    try { return await withTimeout(navigator.mediaDevices.getUserMedia({ audio:false, video }), 10000, stopTracks); }
     catch (e) {
       last = e;
-      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e;   // brak zgody – nie ponawiamy
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'TimeoutError') throw e;
       await sleep(400 * (i + 1));                                                // kamera jeszcze zwalniana
     }
   }
   throw last;
 }
-async function startCamera(){
+/* operacje na kamerze po kolei – równoległe próby (watchdog, przycisk, zmiana kamery) gryzły się ze sobą */
+let camQueue = Promise.resolve();
+function startCamera(){
+  const run = camQueue.then(() => startCameraNow());
+  camQueue = run.catch(() => {});
+  return run;
+}
+async function startCameraNow(){
   stopCamera();
   await sleep(150);                        // daj sterownikowi zwolnić poprzedni strumień
   if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('no getUserMedia'), { name:'NotFoundError' });
@@ -580,9 +618,10 @@ async function startCamera(){
   ]);
   AR.lastFrameAt = performance.now(); AR.lastVideoTime = -1;
   fillCameraList();
+  return AR.stream;
 }
 async function restartCamera(msg){
-  if (AR.restarting) return; AR.restarting = true;
+  if (AR.restarting || AR.mode !== 'camera') return; AR.restarting = true;
   setStatus(msg || 'Łączę z kamerą…', false);
   try { await startCamera(); AR.restarts++; }
   catch (e) { enterTouchMode(camMessage(e), true); }
@@ -643,11 +682,10 @@ function enterTouchMode(msg, canRetry){
 }
 $('touchMode').onclick = () => enterTouchMode(undefined, true);
 $('retryCam').onclick = async () => {
-  $('retryCam').hidden = true; $('loader').hidden = false; $('loaderText').textContent = 'Łączę z kamerą…';
-  const camErr = await startCamera().then(() => null, e => e);
-  const mpErr = camErr ? null : await loadLandmarker().then(() => null, e => e);
-  $('loader').hidden = true;
-  if (!camErr && !mpErr) enterCameraMode(); else enterTouchMode(camErr ? camMessage(camErr) : 'Nie udało się załadować śledzenia dłoni.', true);
+  $('retryCam').hidden = true; AR.mode = 'loading';
+  showLoader('Łączę z kamerą…');
+  const gen = ++AR.gen;
+  applyConnect(gen, await connectCamera());
 };
 $('flip').onclick = async () => {
   AR.facing = AR.facing === 'environment' ? 'user' : 'environment';
