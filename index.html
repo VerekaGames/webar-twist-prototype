@@ -401,7 +401,7 @@ img{max-width:100%}
 const CONFIG = {
   DAILY_POOL: 300,
   CODE_TTL_MIN: 30,
-  TWIST_TARGET_DEG: 100,      // skumulowany obrót nadgarstka potrzebny do odkręcenia
+  TWIST_TARGET_DEG: 65,       // skumulowany obrót nadgarstka potrzebny do odkręcenia
   TOUCH_TARGET_DEG: 270,      // obrót palcem w trybie dotykowym
   MIN_SESSION_MS: 2000,       // antybot: minimalny czas od startu AR do rezerwacji
   NO_HAND_HINT_MS: 8000,      // po tylu ms bez dłoni podświetlamy tryb dotykowy
@@ -891,16 +891,20 @@ function accumulate(angle, maxStep){
 /* kanał obrotu dłoni: wygładzanie + sumowanie „zapadkowe”.
    Liczymy osobno ruch w obie strony i bierzemy większy, więc ruch powrotny
    (puszczam, wracam, kręcę dalej – jak przy nakrętce) nie kasuje postępu. */
-const newChannel = () => ({ prev:null, sm:null, pos:0, neg:0 });
+const newChannel = () => ({ prev:null, last:null, sm:null, pos:0, neg:0 });
 const chScore = ch => Math.max(ch.pos, ch.neg);
 const chSigned = ch => ch.pos >= ch.neg ? ch.pos : -ch.neg;
+const DEAD = 3*Math.PI/180;       // drgania poniżej 3° są ignorowane, ale wolny obrót się sumuje
 function track(ch, raw, maxStep){
-  if (raw === null) { ch.prev = null; ch.sm = null; return; }
-  ch.sm = ch.sm === null ? raw : ch.sm + wrap(raw - ch.sm)*0.6;
-  if (ch.prev === null) { ch.prev = ch.sm; return; }
-  const d = wrap(ch.sm - ch.prev); ch.prev = ch.sm;
-  if (Math.abs(d) > maxStep || Math.abs(d) < .01) return;      // skoki trackera i drgania
+  if (raw === null) { ch.prev = null; ch.last = null; ch.sm = null; return; }
+  ch.sm = ch.sm === null ? raw : ch.sm + wrap(raw - ch.sm)*0.5;
+  if (ch.prev === null) { ch.prev = ch.last = ch.sm; return; }
+  const step = wrap(ch.sm - ch.last); ch.last = ch.sm;
+  if (Math.abs(step) > maxStep) { ch.prev = ch.sm; return; }   // skok trackera w jednej klatce
+  const d = wrap(ch.sm - ch.prev);
+  if (Math.abs(d) < DEAD) return;                              // punkt odniesienia stoi – nic nie ginie
   if (d > 0) ch.pos += d; else ch.neg -= d;
+  ch.prev = ch.sm;
 }
 /* obrót wokół osi dłoni (pronacja/supinacja, jak przy odkręcaniu słoika) z punktów 3D */
 function pronationAngle(w){
@@ -943,7 +947,7 @@ function processHand(res, now){
   // chwyt: kciuk blisko palca wskazującego lub środkowego (jak przy nakrętce), z histerezą
   AR.pinch = Math.min(Math.hypot(th.x - ix.x, th.y - ix.y), Math.hypot(th.x - md.x, th.y - md.y)) / handPx;
   const wasGrip = AR.grip;
-  AR.grip = AR.grip ? AR.pinch < .8 : AR.pinch < .55;
+  AR.grip = AR.grip ? AR.pinch < 1.05 : AR.pinch < .6;
   if (AR.grip && !wasGrip) { AR.gripSince = now; vibrate(8); }
   // ruch całej ręki (przesuwanie, machanie) nie jest obrotem
   const palm = { x: (w.x + a5.x + m9.x + a13.x + a17.x)/5, y: (w.y + a5.y + m9.y + a13.y + a17.y)/5 };
@@ -952,7 +956,7 @@ function processHand(res, now){
   const s = Math.max(48, Math.min(170, handPx*0.62));
   AR.target = { x: (th.x*2 + ix.x + md.x)/4, y: (th.y*2 + ix.y + md.y)/4, s: AR.grip ? s*1.06 : s };
   // obrót liczymy tylko, gdy ciastko jest trzymane (min. 0,25 s) i ręka się nie przesuwa
-  const counting = AR.grip && now - AR.gripSince > 250 && speed < .2;
+  const counting = AR.grip && now - AR.gripSince > 200 && speed < .35;
   if (counting) {
     track(AR.ch.roll, Math.atan2(a17.y - a5.y, a17.x - a5.x), .8);    // linia knykci w płaszczyźnie ekranu
     track(AR.ch.knob, Math.atan2(m9.y - w.y, m9.x - w.x), .8);        // cała dłoń jak gałka
@@ -982,7 +986,7 @@ function drawLandmarks(pts){
   g.fillStyle = '#fff'; g.font = '600 13px system-ui'; const deg = x => Math.round(Math.abs(x)*180/Math.PI);
   g.fillText(`obrót: ${deg(AR.net)}° / ${CONFIG.TWIST_TARGET_DEG}°   ${AR.fps} kl./s`, 16, AR.H - 250);
   g.fillText(CHANNELS.map(k => `${k === AR.bestCh ? '▶' : ''}${({roll:'knykcie',knob:'gałka',pron:'nadgarstek'})[k]} ${deg(chScore(AR.ch[k]))}°`).join('  '), 16, AR.H - 230);
-  g.fillText(`chwyt: ${AR.grip ? 'TAK' : 'nie'} (${AR.pinch.toFixed(2)}, próg 0.55)`, 16, AR.H - 210);
+  g.fillText(`chwyt: ${AR.grip ? 'TAK' : 'nie'} (${AR.pinch.toFixed(2)}, łapie < 0.60, puszcza > 1.05)`, 16, AR.H - 210);
 }
 function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
 
