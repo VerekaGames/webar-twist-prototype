@@ -45,7 +45,7 @@ img{max-width:100%}
     radial-gradient(70% 42% at 50% 34%, rgba(143,211,255,.30) 0%, rgba(47,99,232,.18) 45%, rgba(11,47,159,0) 75%),
     linear-gradient(180deg, var(--blue) 0%, var(--blue) 55%, var(--blue-deep) 100%)}
 .wrap{width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:18px;flex:1;
-  padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:20px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
   padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
 
 /* co-branding */
@@ -59,17 +59,17 @@ img{max-width:100%}
 /* hero */
 .display{font-family:var(--font-display);font-weight:800;line-height:.9;letter-spacing:-.02em;margin:0;text-wrap:balance}
 .hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;margin-top:6px}
-.hero .l1,.hero .l3{font-size:clamp(44px,13vw,64px)}
+.hero .l1,.hero .l3{font-size:clamp(34px,min(13vw,7.4vh),64px)}
 .hero .l1{transform:rotate(-3deg)}
 .hero .l3{transform:rotate(-3deg);color:var(--cream)}
-.hero .logo{width:min(78%,330px);height:auto;margin:-4px 0 -2px;transform:rotate(-3deg);filter:drop-shadow(0 8px 18px rgba(3,12,48,.45))}
+.hero .logo{width:min(74%,330px,40vh);height:auto;margin:-4px 0 -2px;transform:rotate(-3deg);filter:drop-shadow(0 8px 18px rgba(3,12,48,.45))}
 .lead{margin:0;font-size:16.5px;color:var(--muted);max-width:34ch;text-align:center;align-self:center}
 
-.stage-cookie{position:relative;display:grid;place-items:center;min-height:200px;margin:-6px 0 -10px}
-.stage-cookie::before{content:"";position:absolute;width:250px;height:250px;border-radius:50%;
+.stage-cookie{position:relative;display:grid;place-items:center;height:clamp(130px,25vh,240px);margin:-8px 0 -12px}
+.stage-cookie::before{content:"";position:absolute;width:clamp(150px,26vh,250px);height:clamp(150px,26vh,250px);border-radius:50%;
   background:repeating-radial-gradient(circle, rgba(255,255,255,.07) 0 2px, transparent 2px 16px);opacity:.9}
-.stage-cookie::after{content:"";position:absolute;bottom:18px;width:170px;height:22px;border-radius:50%;background:radial-gradient(closest-side, rgba(3,10,40,.55), rgba(3,10,40,0));z-index:0}
-.stage-cookie canvas,.stage-cookie img{position:relative;z-index:1;max-width:100%;height:auto}
+.stage-cookie::after{content:"";position:absolute;bottom:4%;width:170px;height:22px;border-radius:50%;background:radial-gradient(closest-side, rgba(3,10,40,.55), rgba(3,10,40,0));z-index:0}
+.stage-cookie canvas,.stage-cookie img{position:relative;z-index:1;max-width:100%;width:auto;height:clamp(124px,24vh,232px);object-fit:contain}
 .hero-img{animation:bob 3.4s ease-in-out infinite}
 @keyframes bob{50%{transform:translateY(-10px) rotate(-3deg)}}
 .crumb{position:absolute;z-index:1;width:7px;height:7px;border-radius:2px;background:#3a241a;animation:drift 5s ease-in-out infinite}
@@ -89,8 +89,7 @@ img{max-width:100%}
 .steps3 .ic.lis img{width:30px}
 .steps3 strong{color:var(--milk);font-size:13.5px}
 
-.dock{position:sticky;bottom:0;margin:6px calc(-1 * max(20px,env(safe-area-inset-left,0px))) calc(-20px);padding:16px max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(20px,env(safe-area-inset-left,0px));
-  background:var(--blue-deep);display:flex;flex-direction:column;gap:12px;box-shadow:0 -14px 18px -4px var(--blue-deep)}
+.cta{display:flex;flex-direction:column;gap:12px}
 .consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);line-height:1.4}
 .consent input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--cream)}
 .consent button{background:none;border:0;padding:0;color:var(--milk);text-decoration:underline;font-size:inherit}
@@ -207,7 +206,7 @@ img{max-width:100%}
 .stats b{display:block;font-size:20px}
 .stats span{font-size:11px;color:var(--cocoa-soft)}
 
-@media (min-height:820px){.stage-cookie{min-height:230px}}
+@media (max-height:700px){.wrap{gap:14px}.pool{padding:10px 14px}.pool b{font-size:32px}.btn{min-height:52px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -236,23 +235,22 @@ img{max-width:100%}
       <span class="crumb" style="left:24%;bottom:22%;animation-delay:-3s;width:6px;height:6px"></span>
       <canvas id="heroCookie" width="320" height="240" aria-hidden="true"></canvas>
     </div>
-    <p class="lead">Odkręć ciastko w AR i odbierz darmowe opakowanie w aplikacji Lisek.</p>
     <div class="pool" aria-live="polite">
       <b id="poolLeft">300</b>
       <span class="t">z <strong id="poolSize">300</strong> paczek zostało na dziś</span>
       <div class="bar"><i id="poolBar" style="width:100%"></i></div>
+    </div>
+    <div class="cta">
+      <label class="consent" for="terms"><input type="checkbox" id="terms"><span>Akceptuję <button type="button" id="openTerms">regulamin akcji</button> i chcę wziąć udział.</span></label>
+      <button class="btn" id="go" disabled>Włącz kamerę i graj</button>
+      <button class="btn ghost small" id="mine" hidden style="align-self:center">Pokaż mój kod</button>
     </div>
     <ol class="steps3">
       <li><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></span><strong>Odkręć</strong>ciastko gestem dłoni</li>
       <li><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3a3 3 0 0 0 0 6v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a3 3 0 0 0 0-6z"/><path d="M14 5v14" stroke-dasharray="2 2.5"/></svg></span><strong>Zgarnij</strong>swój kod</li>
       <li><span class="ic lis"><img src="assets/lisek-fox.png" alt=""></span><strong>Odbierz</strong>w Lisku za 0 zł</li>
     </ol>
-    <div class="dock">
-      <label class="consent" for="terms"><input type="checkbox" id="terms"><span>Akceptuję <button type="button" id="openTerms">regulamin akcji</button> i chcę wziąć udział.</span></label>
-      <button class="btn" id="go" disabled>Włącz kamerę i graj</button>
-      <button class="btn ghost" id="mine" hidden>Pokaż mój kod</button>
-      <p class="note">Obraz z kamery jest analizowany tylko na Twoim urządzeniu i nigdzie nie jest wysyłany.</p>
-    </div>
+    <p class="note">Obraz z kamery jest analizowany tylko na Twoim urządzeniu i nigdzie nie jest wysyłany.</p>
   </div>
 </section>
 
@@ -403,7 +401,7 @@ img{max-width:100%}
 const CONFIG = {
   DAILY_POOL: 300,
   CODE_TTL_MIN: 30,
-  TWIST_TARGET_DEG: 75,       // skumulowany obrót nadgarstka potrzebny do odkręcenia
+  TWIST_TARGET_DEG: 100,      // skumulowany obrót nadgarstka potrzebny do odkręcenia
   TOUCH_TARGET_DEG: 270,      // obrót palcem w trybie dotykowym
   MIN_SESSION_MS: 2000,       // antybot: minimalny czas od startu AR do rezerwacji
   NO_HAND_HINT_MS: 8000,      // po tylu ms bez dłoni podświetlamy tryb dotykowy
@@ -696,8 +694,8 @@ function camMessage(e){
   if (e && (e.message === 'timeout' || n === 'TimeoutError')) return 'Kamera nie odpowiada. Sprawdź, czy przeglądarka nie czeka na zgodę (ikona kamery w pasku adresu), i spróbuj ponownie.';
   return 'Kamera niedostępna – odkręć ciastko palcem.';
 }
-const CHANNELS = ['roll','grip','knob','pron'];
-function resetTwist(){ AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); }
+const CHANNELS = ['roll','knob','pron'];
+function resetTwist(){ AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); AR.grip = false; AR.gripSince = 0; AR.pinch = 0; AR.prevPalm = null; }
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(UA));
 AR.deviceId = store.get('oreoProto.cam') || null;
@@ -790,7 +788,7 @@ async function loadLandmarker(){
   const vision = await import(`${CONFIG.MP}/vision_bundle.mjs`);
   const fileset = await vision.FilesetResolver.forVisionTasks(`${CONFIG.MP}/wasm`);
   const opts = d => ({ baseOptions:{ modelAssetPath: CONFIG.MODEL, delegate: d }, runningMode:'VIDEO', numHands:1,
-    minHandDetectionConfidence:.3, minHandPresenceConfidence:.3, minTrackingConfidence:.3 });
+    minHandDetectionConfidence:.5, minHandPresenceConfidence:.5, minTrackingConfidence:.4 });
   try { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('GPU')); AR.delegate = 'GPU'; }
   catch { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('CPU')); AR.delegate = 'CPU'; }
   })();
@@ -901,7 +899,7 @@ function track(ch, raw, maxStep){
   ch.sm = ch.sm === null ? raw : ch.sm + wrap(raw - ch.sm)*0.6;
   if (ch.prev === null) { ch.prev = ch.sm; return; }
   const d = wrap(ch.sm - ch.prev); ch.prev = ch.sm;
-  if (Math.abs(d) > maxStep || Math.abs(d) < .006) return;     // skoki trackera i drgania
+  if (Math.abs(d) > maxStep || Math.abs(d) < .01) return;      // skoki trackera i drgania
   if (d > 0) ch.pos += d; else ch.neg -= d;
 }
 /* obrót wokół osi dłoni (pronacja/supinacja, jak przy odkręcaniu słoika) z punktów 3D */
@@ -920,7 +918,7 @@ function pronationAngle(w){
 
 function bestChannel(){
   let best = null, bs = 0;
-  CHANNELS.forEach(k => { const sc = chScore(AR.ch[k]) * (k === 'grip' ? .85 : 1); if (sc > bs) { bs = sc; best = k; } });
+  CHANNELS.forEach(k => { const sc = chScore(AR.ch[k]); if (sc > bs) { bs = sc; best = k; } });
   AR.bestCh = best;
   return best ? Math.sign(chSigned(AR.ch[best]) || 1) * bs : 0;
 }
@@ -931,32 +929,44 @@ function processHand(res, now){
   if (!lm) {
     if (TEST.landmarks) clearLandmarks();
     const lost = now - AR.lastHandAt;
-    if (lost > 250) CHANNELS.forEach(k => track(AR.ch[k], null));
+    if (lost > 250) { CHANNELS.forEach(k => track(AR.ch[k], null)); AR.grip = false; AR.prevPalm = null; }
     if (lost > 2000) { CHANNELS.forEach(k => { AR.ch[k].pos *= .99; AR.ch[k].neg *= .99; }); setStatus('Szukam dłoni', false); }
     AR.net = bestChannel();
     if (lost > CONFIG.NO_HAND_HINT_MS) setInstr('Nie widzę dłoni', 'Dodaj światła i pokaż całą dłoń – albo graj palcem.');
     return;
   }
-  AR.lastHandAt = now;
-  setStatus('Dłoń wykryta', true);
   const p = k => toScreen(lm[k].x, lm[k].y);
-  const w = p(0), m9 = p(9), th = p(4), ix = p(8), md = p(12), a5 = p(5), a17 = p(17);
+  const w = p(0), m9 = p(9), th = p(4), ix = p(8), md = p(12), a5 = p(5), a13 = p(13), a17 = p(17);
   const handPx = Math.hypot(m9.x - w.x, m9.y - w.y);
-  // ciastko w punkcie chwytu: między kciukiem a palcem wskazującym/środkowym
-  AR.target = { x: (th.x*2 + ix.x + md.x)/4, y: (th.y*2 + ix.y + md.y)/4, s: Math.max(48, Math.min(170, handPx*0.62)) };
-  // cztery kanały obrotu – działa dla dłoni od dołu, z boku i od góry:
-  track(AR.ch.roll, Math.atan2(a17.y - a5.y, a17.x - a5.x), 1.0);    // linia knykci w płaszczyźnie ekranu
-  track(AR.ch.grip, Math.atan2(ix.y - th.y, ix.x - th.x), 1.0);      // linia kciuk–palec (chwyt jak nakrętka)
-  track(AR.ch.knob, Math.atan2(m9.y - w.y, m9.x - w.x), 1.0);        // cała dłoń jak gałka
-  track(AR.ch.pron, wl ? pronationAngle(wl) : null, 1.0);            // obrót wokół osi dłoni (3D)
+  if (handPx < 35) { if (TEST.landmarks) clearLandmarks(); return; }         // za mała / fałszywa dłoń
+  AR.lastHandAt = now;
+  // chwyt: kciuk blisko palca wskazującego lub środkowego (jak przy nakrętce), z histerezą
+  AR.pinch = Math.min(Math.hypot(th.x - ix.x, th.y - ix.y), Math.hypot(th.x - md.x, th.y - md.y)) / handPx;
+  const wasGrip = AR.grip;
+  AR.grip = AR.grip ? AR.pinch < .8 : AR.pinch < .55;
+  if (AR.grip && !wasGrip) { AR.gripSince = now; vibrate(8); }
+  // ruch całej ręki (przesuwanie, machanie) nie jest obrotem
+  const palm = { x: (w.x + a5.x + m9.x + a13.x + a17.x)/5, y: (w.y + a5.y + m9.y + a13.y + a17.y)/5 };
+  const speed = AR.prevPalm ? Math.hypot(palm.x - AR.prevPalm.x, palm.y - AR.prevPalm.y) / handPx : 0;
+  AR.prevPalm = palm;
+  const s = Math.max(48, Math.min(170, handPx*0.62));
+  AR.target = { x: (th.x*2 + ix.x + md.x)/4, y: (th.y*2 + ix.y + md.y)/4, s: AR.grip ? s*1.06 : s };
+  // obrót liczymy tylko, gdy ciastko jest trzymane (min. 0,25 s) i ręka się nie przesuwa
+  const counting = AR.grip && now - AR.gripSince > 250 && speed < .2;
+  if (counting) {
+    track(AR.ch.roll, Math.atan2(a17.y - a5.y, a17.x - a5.x), .8);    // linia knykci w płaszczyźnie ekranu
+    track(AR.ch.knob, Math.atan2(m9.y - w.y, m9.x - w.x), .8);        // cała dłoń jak gałka
+    track(AR.ch.pron, wl ? pronationAngle(wl) : null, .8);            // obrót wokół osi dłoni (3D)
+  } else CHANNELS.forEach(k => track(AR.ch[k], null));               // po ponownym chwycie bez skoku
   AR.net = bestChannel();
+  setStatus(AR.grip ? 'Trzymasz ciastko' : 'Dłoń wykryta', true);
   if (TEST.landmarks) drawLandmarks(lm.map((_, i) => p(i)));
-  // dłoń ucięta przy krawędzi kadru – tracking słabnie
   const edge = lm.some(q => q.x < .02 || q.x > .98 || q.y < .02 || q.y > .98);
   const prog = Math.abs(AR.net) / (CONFIG.TWIST_TARGET_DEG*Math.PI/180);
   if (edge) setInstr('Odsuń dłoń', 'Cała dłoń musi być w kadrze – odsuń ją trochę od krawędzi.');
-  else if (prog < .08) setInstr('Złap i przekręć', 'Chwyć ciastko palcami jak nakrętkę i przekręć. Możesz kręcić kilka razy.');
-  else if (prog < 1) setInstr('Kręć dalej!', 'Puść, wróć i przekręć jeszcze raz – postęp się nie kasuje.');
+  else if (!AR.grip) setInstr(prog > .05 ? 'Złap ponownie' : 'Złap ciastko', 'Zbliż kciuk do palców, jakbyś chwytał nakrętkę.');
+  else if (prog < .08) setInstr('Teraz przekręć', 'Obróć nadgarstek. Możesz puścić, wrócić i kręcić dalej.');
+  else setInstr('Kręć dalej!', 'Jeszcze trochę…');
 }
 
 const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
@@ -971,7 +981,8 @@ function drawLandmarks(pts){
   g.strokeStyle = '#7fb2ff'; g.beginPath(); g.moveTo(pts[4].x, pts[4].y); g.lineTo(pts[8].x, pts[8].y); g.stroke();
   g.fillStyle = '#fff'; g.font = '600 13px system-ui'; const deg = x => Math.round(Math.abs(x)*180/Math.PI);
   g.fillText(`obrót: ${deg(AR.net)}° / ${CONFIG.TWIST_TARGET_DEG}°   ${AR.fps} kl./s`, 16, AR.H - 250);
-  g.fillText(CHANNELS.map(k => `${k === AR.bestCh ? '▶' : ''}${({roll:'knykcie',grip:'chwyt',knob:'gałka',pron:'nadgarstek'})[k]} ${deg(chScore(AR.ch[k]))}°`).join('  '), 16, AR.H - 230);
+  g.fillText(CHANNELS.map(k => `${k === AR.bestCh ? '▶' : ''}${({roll:'knykcie',knob:'gałka',pron:'nadgarstek'})[k]} ${deg(chScore(AR.ch[k]))}°`).join('  '), 16, AR.H - 230);
+  g.fillText(`chwyt: ${AR.grip ? 'TAK' : 'nie'} (${AR.pinch.toFixed(2)}, próg 0.55)`, 16, AR.H - 210);
 }
 function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
 
