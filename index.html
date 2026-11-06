@@ -553,7 +553,7 @@ $('loaderSkip').onclick = () => { AR.gen++; hideLoader(); enterTouchMode(undefin
 function camMessage(e){
   const n = e && e.name;
   if (n === 'NotAllowedError' || n === 'SecurityError') return 'Brak zgody na kamerę. Zezwól na nią w pasku adresu i spróbuj ponownie.';
-  if (n === 'NotReadableError' || n === 'AbortError') return 'Kamera jest zajęta (np. przez Teams, Zoom lub inną kartę). Zamknij ją i spróbuj ponownie.';
+  if (n === 'NotReadableError' || n === 'AbortError') return 'Kamera jest zajęta przez inną aplikację (Discord, Teams, Zoom, OBS) albo inną kartę z tą stroną. Zamknij ją i spróbuj ponownie.';
   if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Nie znaleziono kamery. Podłącz kamerkę i spróbuj ponownie.';
   if (e && (e.message === 'timeout' || n === 'TimeoutError')) return 'Kamera nie odpowiada. Sprawdź, czy przeglądarka nie czeka na zgodę (ikona kamery w pasku adresu), i spróbuj ponownie.';
   return 'Kamera niedostępna – odkręć ciastko palcem.';
