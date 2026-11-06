@@ -293,7 +293,7 @@ img{max-width:100%}
       <svg class="ring" viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" id="ringFg" cx="32" cy="32" r="27"/><text x="32" y="33" id="ringTxt">0%</text></svg>
     </div>
     <p class="instr" id="instr">Pokaż dłoń</p>
-    <p class="sub" id="sub">Chwyć ciastko palcami jak nakrętkę i przekręć.</p>
+    <p class="sub" id="sub">Pokaż dłoń i przekręć ją jak gałkę.</p>
     <button class="btn ghost small" id="touchMode">Kamera nie działa? Graj palcem</button>
     <button class="btn ghost small" id="retryCam" hidden>Spróbuj ponownie z kamerą</button>
   </div>
@@ -401,7 +401,7 @@ img{max-width:100%}
 const CONFIG = {
   DAILY_POOL: 300,
   CODE_TTL_MIN: 30,
-  TWIST_TARGET_DEG: 65,       // skumulowany obrót nadgarstka potrzebny do odkręcenia
+  TWIST_TARGET_DEG: 70,       // skumulowany obrót nadgarstka potrzebny do odkręcenia
   TOUCH_TARGET_DEG: 270,      // obrót palcem w trybie dotykowym
   MIN_SESSION_MS: 2000,       // antybot: minimalny czas od startu AR do rezerwacji
   NO_HAND_HINT_MS: 8000,      // po tylu ms bez dłoni podświetlamy tryb dotykowy
@@ -694,8 +694,8 @@ function camMessage(e){
   if (e && (e.message === 'timeout' || n === 'TimeoutError')) return 'Kamera nie odpowiada. Sprawdź, czy przeglądarka nie czeka na zgodę (ikona kamery w pasku adresu), i spróbuj ponownie.';
   return 'Kamera niedostępna – odkręć ciastko palcem.';
 }
-const CHANNELS = ['roll','knob','pron'];
-function resetTwist(){ AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); AR.grip = false; AR.gripSince = 0; AR.pinch = 0; AR.prevPalm = null; }
+const CHANNELS = ['palm'];
+function resetTwist(){ AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); AR.prevPts = null; AR.orient = 0; AR.handSince = 0; AR.prevPalm = null; AR.signed = 0; }
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(UA));
 AR.deviceId = store.get('oreoProto.cam') || null;
@@ -809,7 +809,7 @@ function enterCameraMode(){
   fillCameraList();
   $('lm').hidden = !TEST.landmarks;
   setStatus('Szukam dłoni', false);
-  setInstr('Pokaż dłoń', 'Cała dłoń w kadrze, potem chwyć ciastko palcami jak nakrętkę i przekręć.');
+  setInstr('Pokaż dłoń', 'Pokaż całą dłoń w kadrze, potem przekręć ją jak gałkę.');
 }
 function enterTouchMode(msg, canRetry){
   AR.mode = 'touch'; resetTwist(); setProgress(0);
@@ -821,6 +821,7 @@ function enterTouchMode(msg, canRetry){
   if (!IS_MOBILE && !msg) msg = 'Przytrzymaj przycisk myszy i kręć kursorem dookoła ciastka.';
   setInstr('Kręć palcem', msg || 'Kręć palcem dookoła ciastka, aby je odkręcić.');
   AR.target = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
+  AR.lean = null;
 }
 $('touchMode').onclick = () => enterTouchMode(undefined, true);
 $('retryCam').onclick = async () => {
@@ -927,50 +928,57 @@ function bestChannel(){
   return best ? Math.sign(chSigned(AR.ch[best]) || 1) * bs : 0;
 }
 
+/* obrót dłoni jako sztywnej bryły (2D Kabsch) między kolejnymi klatkami.
+   Tylko punkty dłoni (nadgarstek + podstawy palców): ruch palców, przesuwanie,
+   przybliżanie i zgięcie nadgarstka nie dają obrotu – liczy się tylko przekręcenie. */
+const PALM = [0, 1, 5, 9, 13, 17];
+function palmRotation(P, Q){
+  let px = 0, py = 0, qx = 0, qy = 0;
+  P.forEach((a, i) => { px += a.x; py += a.y; qx += Q[i].x; qy += Q[i].y; });
+  const n = P.length; px /= n; py /= n; qx /= n; qy /= n;
+  let sc = 0, cc = 0;
+  P.forEach((a, i) => { const ax = a.x - px, ay = a.y - py, bx = Q[i].x - qx, by = Q[i].y - qy; sc += ax*by - ay*bx; cc += ax*bx + ay*by; });
+  return Math.atan2(sc, cc);            // + = zgodnie z ruchem wskazówek zegara na ekranie
+}
+
 function processHand(res, now){
   const lm = res.landmarks && res.landmarks[0];
-  const wl = res.worldLandmarks && res.worldLandmarks[0];
   if (!lm) {
     if (TEST.landmarks) clearLandmarks();
     const lost = now - AR.lastHandAt;
-    if (lost > 250) { CHANNELS.forEach(k => track(AR.ch[k], null)); AR.grip = false; AR.prevPalm = null; }
-    if (lost > 2000) { CHANNELS.forEach(k => { AR.ch[k].pos *= .99; AR.ch[k].neg *= .99; }); setStatus('Szukam dłoni', false); }
+    if (lost > 250) { CHANNELS.forEach(k => track(AR.ch[k], null)); AR.prevPts = null; AR.prevPalm = null; AR.handSince = 0; }
+    if (lost > 600) { setStatus('Szukam dłoni', false); AR.lean = null; }
     AR.net = bestChannel();
     if (lost > CONFIG.NO_HAND_HINT_MS) setInstr('Nie widzę dłoni', 'Dodaj światła i pokaż całą dłoń – albo graj palcem.');
     return;
   }
   const p = k => toScreen(lm[k].x, lm[k].y);
-  const w = p(0), m9 = p(9), th = p(4), ix = p(8), md = p(12), a5 = p(5), a13 = p(13), a17 = p(17);
+  const pts = PALM.map(p);
+  const w = pts[0], m9 = p(9);
   const handPx = Math.hypot(m9.x - w.x, m9.y - w.y);
-  if (handPx < 35) { if (TEST.landmarks) clearLandmarks(); return; }         // za mała / fałszywa dłoń
+  if (handPx < 35) { if (TEST.landmarks) clearLandmarks(); return; }        // za mała / fałszywa dłoń
   AR.lastHandAt = now;
-  // chwyt: kciuk blisko palca wskazującego lub środkowego (jak przy nakrętce), z histerezą
-  AR.pinch = Math.min(Math.hypot(th.x - ix.x, th.y - ix.y), Math.hypot(th.x - md.x, th.y - md.y)) / handPx;
-  const wasGrip = AR.grip;
-  AR.grip = AR.grip ? AR.pinch < 1.05 : AR.pinch < .6;
-  if (AR.grip && !wasGrip) { AR.gripSince = now; vibrate(8); }
-  // ruch całej ręki (przesuwanie, machanie) nie jest obrotem
-  const palm = { x: (w.x + a5.x + m9.x + a13.x + a17.x)/5, y: (w.y + a5.y + m9.y + a13.y + a17.y)/5 };
+  if (!AR.handSince) AR.handSince = now;
+  const palm = pts.reduce((a, q) => ({ x: a.x + q.x/pts.length, y: a.y + q.y/pts.length }), { x:0, y:0 });
   const speed = AR.prevPalm ? Math.hypot(palm.x - AR.prevPalm.x, palm.y - AR.prevPalm.y) / handPx : 0;
   AR.prevPalm = palm;
-  const s = Math.max(48, Math.min(170, handPx*0.62));
-  AR.target = { x: (th.x*2 + ix.x + md.x)/4, y: (th.y*2 + ix.y + md.y)/4, s: AR.grip ? s*1.06 : s };
-  // obrót liczymy tylko, gdy ciastko jest trzymane (min. 0,25 s) i ręka się nie przesuwa
-  const counting = AR.grip && now - AR.gripSince > 200 && speed < .35;
-  if (counting) {
-    track(AR.ch.roll, Math.atan2(a17.y - a5.y, a17.x - a5.x), .8);    // linia knykci w płaszczyźnie ekranu
-    track(AR.ch.knob, Math.atan2(m9.y - w.y, m9.x - w.x), .8);        // cała dłoń jak gałka
-    track(AR.ch.pron, wl ? pronationAngle(wl) : null, .8);            // obrót wokół osi dłoni (3D)
-  } else CHANNELS.forEach(k => track(AR.ch[k], null));               // po ponownym chwycie bez skoku
+  AR.lean = palm;                                                            // ciastko lekko „patrzy” w stronę dłoni
+  // przyrost obrotu tej klatki, sumowany do orientacji dłoni
+  let dA = AR.prevPts ? palmRotation(AR.prevPts, pts) : 0;
+  AR.prevPts = pts;
+  if (Math.abs(dA) > .6) dA = 0;                                            // skok trackera
+  AR.orient += dA;
+  const counting = now - AR.handSince > 300 && speed < .3;                  // dłoń ustabilizowana, bez machania
+  if (counting) track(AR.ch.palm, AR.orient, .8); else track(AR.ch.palm, null);
   AR.net = bestChannel();
-  setStatus(AR.grip ? 'Trzymasz ciastko' : 'Dłoń wykryta', true);
+  AR.signed = chSigned(AR.ch.palm);
+  setStatus('Dłoń wykryta', true);
   if (TEST.landmarks) drawLandmarks(lm.map((_, i) => p(i)));
   const edge = lm.some(q => q.x < .02 || q.x > .98 || q.y < .02 || q.y > .98);
   const prog = Math.abs(AR.net) / (CONFIG.TWIST_TARGET_DEG*Math.PI/180);
   if (edge) setInstr('Odsuń dłoń', 'Cała dłoń musi być w kadrze – odsuń ją trochę od krawędzi.');
-  else if (!AR.grip) setInstr(prog > .05 ? 'Złap ponownie' : 'Złap ciastko', 'Zbliż kciuk do palców, jakbyś chwytał nakrętkę.');
-  else if (prog < .08) setInstr('Teraz przekręć', 'Obróć nadgarstek. Możesz puścić, wrócić i kręcić dalej.');
-  else setInstr('Kręć dalej!', 'Jeszcze trochę…');
+  else if (prog < .08) setInstr('Przekręć dłoń', 'Obróć dłoń jak gałkę albo nakrętkę – ciastko odkręci się razem z nią.');
+  else if (prog < 1) setInstr('Kręć dalej!', 'Możesz wrócić dłonią i przekręcić jeszcze raz.');
 }
 
 const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
@@ -982,11 +990,10 @@ function drawLandmarks(pts){
   BONES.forEach(([a,b]) => { g.beginPath(); g.moveTo(pts[a].x, pts[a].y); g.lineTo(pts[b].x, pts[b].y); g.stroke(); });
   pts.forEach((q, i) => { g.beginPath(); g.arc(q.x, q.y, i === 5 || i === 17 ? 6 : 3.5, 0, Math.PI*2); g.fillStyle = i === 5 || i === 17 ? '#ffcf4a' : '#fff'; g.fill(); });
   g.strokeStyle = '#ffcf4a'; g.lineWidth = 3; g.beginPath(); g.moveTo(pts[5].x, pts[5].y); g.lineTo(pts[17].x, pts[17].y); g.stroke();
-  g.strokeStyle = '#7fb2ff'; g.beginPath(); g.moveTo(pts[4].x, pts[4].y); g.lineTo(pts[8].x, pts[8].y); g.stroke();
+  g.strokeStyle = '#7fb2ff'; g.beginPath(); [0,1,5,9,13,17,0].forEach((k, i) => i ? g.lineTo(pts[k].x, pts[k].y) : g.moveTo(pts[k].x, pts[k].y)); g.stroke();
   g.fillStyle = '#fff'; g.font = '600 13px system-ui'; const deg = x => Math.round(Math.abs(x)*180/Math.PI);
   g.fillText(`obrót: ${deg(AR.net)}° / ${CONFIG.TWIST_TARGET_DEG}°   ${AR.fps} kl./s`, 16, AR.H - 250);
-  g.fillText(CHANNELS.map(k => `${k === AR.bestCh ? '▶' : ''}${({roll:'knykcie',knob:'gałka',pron:'nadgarstek'})[k]} ${deg(chScore(AR.ch[k]))}°`).join('  '), 16, AR.H - 230);
-  g.fillText(`chwyt: ${AR.grip ? 'TAK' : 'nie'} (${AR.pinch.toFixed(2)}, łapie < 0.60, puszcza > 1.05)`, 16, AR.H - 210);
+  g.fillText(`liczenie: ${performance.now() - AR.handSince > 300 ? 'tak' : 'czekam'}  orientacja dłoni: ${Math.round(AR.orient*180/Math.PI)}°`, 16, AR.H - 230);
 }
 function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
 
@@ -1021,16 +1028,23 @@ function loop(now, token){
   if (!AR.done && prog >= 1) win();
 
   // pozycja ciastka (wygładzona)
-  const k = AR.mode === 'camera' ? .5 : .25;
+  if (AR.mode === 'camera') {
+    const base = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
+    const l = AR.lean;
+    AR.target = l ? { x: base.x + (l.x - base.x)*.06, y: base.y + (l.y - base.y)*.06, s: base.s*1.04 } : base;
+  }
+  const k = .15;
   AR.cur.x += (AR.target.x - AR.cur.x)*k; AR.cur.y += (AR.target.y - AR.cur.y)*k; AR.cur.s += (AR.target.s - AR.cur.s)*k;
   const ck = AR.cookie, g = ck.group;
   g.position.set(AR.cur.x - AR.W/2, AR.H/2 - AR.cur.y, 0);
   g.scale.setScalar(AR.cur.s);
   if (AR.shadow) { AR.shadow.position.set(g.position.x, g.position.y - AR.cur.s*0.95, -AR.cur.s); AR.shadow.scale.set(AR.cur.s*2.4, AR.cur.s*0.55, 1); AR.shadow.material.opacity = AR.done ? .5 : .9; }
-  g.rotation.x = AR.mode === 'camera' ? 1.2 : .95; g.rotation.z = Math.sin(now/1300)*.06;
+  const lx = AR.mode === 'camera' && AR.lean ? Math.max(-1, Math.min(1, (AR.lean.x - AR.W/2)/(AR.W/2))) : 0;
+  const ly = AR.mode === 'camera' && AR.lean ? Math.max(-1, Math.min(1, (AR.lean.y - AR.H*.42)/(AR.H/2))) : 0;
+  g.rotation.x = 1.15 + ly*.12; g.rotation.y = lx*.18; g.rotation.z = Math.sin(now/1300)*.05;
   const spin = Math.sign(AR.net || 1);
   if (!AR.done) {
-    ck.topPivot.rotation.y = AR.net*1.2;
+    ck.topPivot.rotation.y = -(AR.mode === 'camera' ? AR.signed : AR.net);   // 1:1 z obrotem dłoni / palca, ten sam kierunek
     ck.bottom.rotation.y = -AR.net*.15;
     ck.topPivot.position.y = .26 + prog*.12;
   } else {
