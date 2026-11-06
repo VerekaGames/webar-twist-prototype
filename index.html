@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2f9f">
+<title>Zgarnij Oreo – prototyp WebAR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-screen mobile app, screens stacked and swapped; blue campaign world (single theme by choice) */
+:root{
+  --blue:#0b2f9f;
+  --blue-deep:#06195a;
+  --blue-line:#3256c9;
+  --milk:#ffffff;
+  --cream:#fff6e4;
+  --cocoa:#1c120e;
+  --ok:#3ddc97;
+  --warn:#ffcf4a;
+  --muted:#b9c6f2;
+  --font-display:"Bricolage Grotesque","Arial Black",system-ui,sans-serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--blue);color:var(--milk);font:16px/1.45 var(--font-body);-webkit-font-smoothing:antialiased;overflow:hidden;touch-action:manipulation}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--warn);outline-offset:3px}
+a{color:inherit}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 20px) max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 20px) max(20px,env(safe-area-inset-left,0px));
+  overflow-y:auto}
+.wrap{width:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:18px;flex:1;padding-bottom:44px}
+
+.proto{align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue-deep);background:var(--warn);padding:4px 8px;border-radius:4px}
+.display{font-family:var(--font-display);font-weight:800;line-height:.92;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.hero-title{font-size:clamp(52px,15vw,76px)}
+.hero-title em{font-style:normal;display:block;color:var(--cream)}
+.lead{margin:0;font-size:17px;color:var(--muted);max-width:34ch}
+
+.pool{display:flex;align-items:baseline;gap:10px;padding:14px 16px;border:1.5px solid var(--blue-line);border-radius:14px;background:var(--blue-deep)}
+.pool b{font-family:var(--font-display);font-size:34px;font-variant-numeric:tabular-nums;line-height:1}
+.pool span{color:var(--muted);font-size:14px}
+.pool .bar{flex:1;height:6px;border-radius:3px;background:var(--blue-line);align-self:center;overflow:hidden}
+.pool .bar i{display:block;height:100%;background:var(--cream);border-radius:3px;transition:width .6s}
+
+.stage-cookie{display:grid;place-items:center;flex:1;min-height:150px}
+.stage-cookie canvas{max-width:100%}
+
+.consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);line-height:1.4}
+.consent input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--cream)}
+.consent button{background:none;border:0;padding:0;color:var(--milk);text-decoration:underline;font-size:inherit}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:56px;border:0;border-radius:999px;background:var(--milk);color:var(--blue);font-weight:700;font-size:17px;padding:0 24px;transition:transform .12s,opacity .2s}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--milk);border:1.5px solid var(--blue-line)}
+.btn.small{min-height:44px;font-size:15px;width:auto}
+
+.banner{background:var(--warn);color:var(--blue-deep);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.35}
+.banner b{display:block;margin-bottom:2px}
+.banner button{margin-top:8px;background:var(--blue-deep);color:var(--milk);border:0;border-radius:999px;padding:8px 14px;font-weight:600;font-size:13px}
+
+/* AR */
+#ar{padding:0;background:#000}
+#ar video,#ar canvas.gl{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#ar video.mirror{transform:scaleX(-1)}
+#ar .backdrop{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 40%,#1b46c7 0%,var(--blue) 45%,var(--blue-deep) 100%)}
+#ar canvas.gl{touch-action:none}
+.hud-top{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:center;gap:10px;pointer-events:none}
+.hud-top>*{pointer-events:auto}
+.chip{display:inline-flex;align-items:center;gap:8px;background:rgba(6,25,90,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none}
+.dot.ok{background:var(--ok)}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:0;background:rgba(6,25,90,.78);color:var(--milk);display:grid;place-items:center;backdrop-filter:blur(8px)}
+.hud-bottom{position:absolute;left:0;right:0;bottom:0;padding:24px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;align-items:center;gap:12px;background:linear-gradient(to top,rgba(6,25,90,.85),rgba(6,25,90,0));pointer-events:none}
+.hud-bottom>*{pointer-events:auto}
+.instr{font-family:var(--font-display);font-weight:800;font-size:28px;line-height:1;text-align:center;margin:0;text-shadow:0 2px 12px rgba(0,0,0,.35);text-wrap:balance}
+.sub{margin:0;font-size:14px;color:var(--cream);text-align:center;max-width:32ch}
+.ring{width:64px;height:64px}
+.ring circle{fill:none;stroke-width:6}
+.ring .bg{stroke:rgba(255,255,255,.22)}
+.ring .fg{stroke:var(--cream);stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .1s linear}
+.ring text{fill:var(--milk);font:700 15px var(--font-body);text-anchor:middle;dominant-baseline:central}
+.loader{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:var(--blue);gap:14px;align-content:center}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--blue-line);border-top-color:var(--cream);animation:spin .9s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.flash{position:absolute;inset:0;background:var(--cream);opacity:0;pointer-events:none;transition:opacity .35s}
+
+/* success */
+.codebox{background:var(--cream);color:var(--cocoa);border-radius:18px;padding:20px 18px;display:flex;flex-direction:column;gap:12px;align-items:stretch}
+.codebox small{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b5a4b}
+.code{font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;font-size:clamp(26px,8.4vw,36px);font-weight:700;letter-spacing:.06em;text-align:center;user-select:all;-webkit-user-select:all;word-break:break-all}
+.codebox .btn{background:var(--blue);color:var(--milk)}
+.timer{display:flex;justify-content:space-between;font-size:14px;color:#6b5a4b;font-variant-numeric:tabular-nums}
+.timer b{color:var(--cocoa)}
+.steps{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:4px}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translate(-50%,20px);background:var(--cocoa);color:var(--milk);padding:12px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* sheets */
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(3,10,40,.6);display:flex;align-items:flex-end;justify-content:center}
+.sheet>div{background:var(--milk);color:var(--cocoa);width:100%;max-width:520px;max-height:86%;overflow-y:auto;border-radius:22px 22px 0 0;padding:22px max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 22px) max(20px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet h2{font-family:var(--font-display);font-size:26px;margin:0;line-height:1}
+.sheet p,.sheet li{font-size:14.5px;margin:0;color:#3b3530}
+.sheet ol{margin:0;padding-left:20px;display:grid;gap:8px}
+.sheet .btn{background:var(--blue);color:var(--milk)}
+.sheet .btn.ghost{background:transparent;color:var(--blue);border-color:var(--blue)}
+.sheet code{background:#f1ede6;padding:2px 6px;border-radius:4px;font-size:12.5px;word-break:break-all}
+.tag{align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#f1ede6;color:#6b5a4b;padding:4px 8px;border-radius:4px}
+
+/* demo panel */
+#demoBtn{position:fixed;z-index:40;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 12px);border:0;border-radius:999px;background:var(--warn);color:var(--blue-deep);font-weight:700;font-size:12px;padding:8px 12px;letter-spacing:.06em}
+#ar:not([hidden]) ~ #demoBtn{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 70px)}
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.demo-grid button{min-height:44px;border-radius:10px;border:1.5px solid #d9d3c9;background:#faf8f4;color:var(--cocoa);font-size:13.5px;font-weight:600;padding:6px}
+.opt{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--cocoa)}
+.opt input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--blue)}
+#lm{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.camsel{appearance:none;-webkit-appearance:none;max-width:46vw;height:44px;border:0;border-radius:999px;background:rgba(6,25,90,.78);color:var(--milk);font:600 13px var(--font-body);padding:0 14px;backdrop-filter:blur(8px)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-variant-numeric:tabular-nums}
+.stats div{background:#f4f1ec;border-radius:10px;padding:8px 4px}
+.stats b{display:block;font-size:20px}
+.stats span{font-size:11px;color:#6b5a4b}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- 1. LANDING -->
+<section class="screen" id="start">
+  <div class="wrap">
+    <span class="proto">Prototyp · kody demonstracyjne</span>
+    <div id="inapp" class="banner" hidden>
+      <b>Otwórz w przeglądarce</b>
+      Ta aplikacja może blokować kamerę. Stuknij ⋯ w rogu i wybierz „Otwórz w przeglądarce”.
+      <div><button type="button" id="copyLink">Kopiuj link</button></div>
+    </div>
+    <h1 class="display hero-title">Zgarnij <em>Oreo</em> do obiadku!</h1>
+    <p class="lead">Odkręć ciastko w AR i odbierz darmowe opakowanie w aplikacji Lisek.</p>
+    <div class="pool" aria-live="polite"><b id="poolLeft">300</b><span>z <span id="poolSize">300</span> paczek zostało dziś</span><div class="bar"><i id="poolBar" style="width:100%"></i></div></div>
+    <div class="stage-cookie"><canvas id="heroCookie" width="260" height="200" aria-hidden="true"></canvas></div>
+    <label class="consent" for="terms"><input type="checkbox" id="terms"><span>Akceptuję <button type="button" id="openTerms">regulamin akcji</button> i chcę wziąć udział.</span></label>
+    <button class="btn" id="go" disabled>Włącz kamerę i graj</button>
+    <button class="btn ghost" id="mine" hidden>Pokaż mój kod</button>
+    <p class="note">Obraz z kamery jest analizowany tylko na Twoim telefonie i nigdzie nie jest wysyłany.</p>
+  </div>
+</section>
+
+<!-- 2. KODY WYCZERPANE -->
+<section class="screen" id="soldout" hidden>
+  <div class="wrap" style="justify-content:center">
+    <span class="proto">Prototyp</span>
+    <h1 class="display hero-title">Na dziś <em>wszystko zgarnięte</em></h1>
+    <p class="lead">Dzisiejsze <span id="soPool">300</span> paczek Oreo już ma właścicieli. Kolejna pula startuje jutro o 11:00.</p>
+    <button class="btn ghost" id="soTerms">Regulamin akcji</button>
+  </div>
+</section>
+
+<!-- 3. AR -->
+<section class="screen" id="ar" hidden>
+  <div class="backdrop" id="backdrop"></div>
+  <video id="video" playsinline muted autoplay></video>
+  <canvas class="gl" id="gl"></canvas>
+  <canvas id="lm" hidden></canvas>
+  <div class="flash" id="flash"></div>
+  <div class="hud-top">
+    <span class="chip"><i class="dot" id="statusDot"></i><span id="statusText">Uruchamiam…</span></span>
+    <span style="display:flex;gap:8px">
+      <select class="camsel" id="camSel" aria-label="Wybierz kamerę" hidden></select>
+      <button class="iconbtn" id="flip" aria-label="Przełącz kamerę" title="Przełącz kamerę"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l2-3h6l2 3h4v12H3z"/><path d="M9 13a3 3 0 0 0 5.6 1.5M15 12a3 3 0 0 0-5.6-1.5"/><path d="M14.5 15.5V14H16M9.5 8.5V10H8"/></svg></button>
+      <button class="iconbtn" id="close" aria-label="Zamknij" title="Zamknij"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </span>
+  </div>
+  <div class="hud-bottom">
+    <svg class="ring" viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" id="ringFg" cx="32" cy="32" r="27"/><text x="32" y="33" id="ringTxt">0%</text></svg>
+    <p class="instr" id="instr">Pokaż dłoń</p>
+    <p class="sub" id="sub">Chwyć ciastko kciukiem i palcem wskazującym, potem przekręć nadgarstek.</p>
+    <button class="btn ghost small" id="touchMode">Kamera nie działa? Graj palcem</button>
+  </div>
+  <div class="loader" id="loader"><div class="spin"></div><p class="sub" id="loaderText">Ładuję kamerę i śledzenie dłoni…</p></div>
+</section>
+
+<!-- 4. SUKCES -->
+<section class="screen" id="success" hidden>
+  <div class="wrap">
+    <span class="proto">Prototyp · kod demonstracyjny</span>
+    <h1 class="display hero-title" id="succTitle">Zgarnięte!</h1>
+    <p class="lead" id="succLead">Twoje darmowe Oreo czeka w Lisku.</p>
+    <div class="codebox">
+      <small>Twój kod</small>
+      <div class="code" id="code">OREO-XXXX-XXXX</div>
+      <button class="btn" id="copyCode">Kopiuj kod</button>
+      <div class="timer"><span>Kod ważny jeszcze</span><b id="ttl">30:00</b></div>
+    </div>
+    <button class="btn" id="toLisek">Odbierz w aplikacji Lisek</button>
+    <ol class="steps">
+      <li>Otworzy się Lisek z Oreo w koszyku za 0 zł.</li>
+      <li>Jeśli nie, wklej kod w koszyku ręcznie.</li>
+    </ol>
+    <button class="btn ghost" id="again">Resetuj i zagraj jeszcze raz (test)</button>
+  </div>
+</section>
+
+<!-- SHEETS -->
+<div class="sheet" id="termsSheet" hidden role="dialog" aria-modal="true" aria-labelledby="termsH">
+  <div>
+    <span class="tag">Wersja robocza · do akceptacji prawnej</span>
+    <h2 id="termsH">Regulamin akcji „Zgarnij Oreo”</h2>
+    <ol>
+      <li>Codziennie od 11:00 dostępna jest pula 300 darmowych opakowań Oreo do odebrania w aplikacji Lisek.</li>
+      <li>Kod otrzymujesz po wykonaniu zadania w AR (odkręcenie ciastka gestem dłoni lub palcem na ekranie).</li>
+      <li>Jedno urządzenie może zgarnąć jeden kod dziennie. Ponowna próba pokazuje ten sam kod.</li>
+      <li>Kod jest ważny 30 minut od wydania. Niezrealizowany kod wygasa, a paczka wraca do puli.</li>
+      <li>O otrzymaniu nagrody decyduje kolejność realizacji kodu w aplikacji Lisek.</li>
+      <li>Obraz z kamery jest przetwarzany wyłącznie lokalnie na urządzeniu i nie jest zapisywany ani przesyłany.</li>
+    </ol>
+    <button class="btn" data-close>Zamknij</button>
+  </div>
+</div>
+
+<div class="sheet" id="liskSheet" hidden role="dialog" aria-modal="true" aria-labelledby="liskH">
+  <div>
+    <span class="tag">Symulacja integracji</span>
+    <h2 id="liskH">Przekierowanie do Liska</h2>
+    <p>W wersji produkcyjnej ten przycisk otwiera aplikację Lisek przez deep link z kodem, a Oreo trafia do koszyka z ceną 0 zł. Bez aplikacji – przekierowanie do sklepu z aplikacjami.</p>
+    <p>Przykładowy link: <code id="deeplink"></code></p>
+    <button class="btn" id="simRedeem">Symuluj realizację kodu w Lisku</button>
+    <button class="btn ghost" data-close>Wróć</button>
+  </div>
+</div>
+
+<div class="sheet" id="demoSheet" hidden role="dialog" aria-modal="true" aria-labelledby="demoH">
+  <div>
+    <span class="tag">Panel prezentacyjny · tylko prototyp</span>
+    <h2 id="demoH">Pula kodów (symulacja)</h2>
+    <div class="stats">
+      <div><b id="stFree">–</b><span>wolne</span></div>
+      <div><b id="stRes">–</b><span>rezerwacje</span></div>
+      <div><b id="stRed">–</b><span>zrealiz.</span></div>
+      <div><b id="stExp">–</b><span>wygasłe</span></div>
+    </div>
+    <p>Symulowany backend działa w pamięci tej przeglądarki. W produkcji te same wywołania trafiają do usługi rezerwacji i endpointów Liska.</p>
+    <div class="demo-grid">
+      <button id="dmReset">Resetuj wszystko</button>
+      <button id="dmExpire">Wygaś mój kod</button>
+      <button id="dmZero">Wyczerpaj pulę (0)</button>
+      <button id="dmThree">Zostaw 3 kody</button>
+    </div>
+    <label class="opt" for="optNoLimit"><input type="checkbox" id="optNoLimit"> Bez limitu 1 kod / urządzenie (każda gra daje nowy kod)</label>
+    <label class="opt" for="optLm"><input type="checkbox" id="optLm"> Pokaż punkty dłoni w AR (debug)</label>
+    <p style="font-size:12.5px;color:#6b5a4b">Szybki reset z linku: dopisz <code>#reset</code> na końcu adresu.</p>
+    <p id="dmFps" style="font-size:12.5px;color:#6b5a4b">Śledzenie dłoni: –</p>
+    <button class="btn ghost" data-close>Zamknij</button>
+  </div>
+</div>
+
+<button id="demoBtn" type="button">DEMO</button>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* =====================================================================
+   KONFIGURACJA
+   ===================================================================== */
+const CONFIG = {
+  DAILY_POOL: 300,
+  CODE_TTL_MIN: 30,
+  TWIST_TARGET_DEG: 120,      // skumulowany obrót nadgarstka potrzebny do odkręcenia
+  TOUCH_TARGET_DEG: 300,      // obrót palcem w trybie dotykowym
+  MIN_SESSION_MS: 2000,       // antybot: minimalny czas od startu AR do rezerwacji
+  NO_HAND_HINT_MS: 8000,      // po tylu ms bez dłoni podświetlamy tryb dotykowy
+  MP: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14',
+  MODEL: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+  THREE: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+  LISEK_DEEPLINK: code => `lisek://promo?code=${encodeURIComponent(code)}&sku=OREO_154G&price=0`
+};
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+/* ustawienia testowe (panel DEMO) */
+const TEST = Object.assign({ noLimit:false, landmarks:false }, store.get('oreoProto.test') || {});
+const saveTest = () => store.set('oreoProto.test', TEST);
+
+/* =====================================================================
+   SYMULOWANY BACKEND KODÓW
+   W produkcji: GET /api/pool, POST /api/reserve, webhook realizacji z Liska.
+   Logika: kod dopiero po geście, 1 kod / urządzenie / dzień (idempotencja),
+   rezerwacja z TTL, wygasła rezerwacja zwalnia miejsce w puli.
+   ===================================================================== */
+const CodeService = (() => {
+  const KEY = 'oreoProto.pool.v1';
+  const today = () => new Date().toLocaleDateString('sv-SE');
+  let deviceId = store.get('oreoProto.device');
+  if (!deviceId) { deviceId = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2); store.set('oreoProto.device', deviceId); }
+
+  function load(){
+    let s = store.get(KEY);
+    if (!s || s.day !== today()) s = { day: today(), poolSize: CONFIG.DAILY_POOL, consumed: 0, list: [] };
+    const now = Date.now();
+    s.list.forEach(r => { if (r.status === 'reserved' && r.expiresAt < now) r.status = 'expired'; });
+    return s;
+  }
+  function save(s){ store.set(KEY, s); }
+  function counts(s){
+    const c = { reserved:0, redeemed:0, expired:0 };
+    s.list.forEach(r => c[r.status]++);
+    // "consumed" symuluje innych uczestników (wyczerpanie puli w demo)
+    const free = Math.max(0, s.poolSize - s.consumed - c.reserved - c.redeemed);
+    return { ...c, free, poolSize: s.poolSize };
+  }
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const rnd = n => Array.from({length:n}, () => ALPH[Math.floor(Math.random()*ALPH.length)]).join('');
+
+  return {
+    async availability(){ await delay(250); const s = load(); save(s); return counts(s); },
+    mine(){ const s = load(); return s.list.find(r => r.device === deviceId && r.status !== 'expired') || null; },
+    async reserve({ nonce, startedAt }){
+      await delay(500);
+      const s = load();
+      const existing = s.list.find(r => r.device === deviceId && r.status !== 'expired');
+      if (existing && !TEST.noLimit) return { ok:true, reused:true, ...existing };   // idempotencja
+      if (existing && TEST.noLimit) existing.status = 'expired';                    // tryb testowy: zwolnij poprzedni
+      if (Date.now() - startedAt < CONFIG.MIN_SESSION_MS) return { ok:false, error:'too_fast' };
+      if (s.list.some(r => r.nonce === nonce)) return { ok:false, error:'nonce_used' };
+      if (counts(s).free <= 0) return { ok:false, error:'sold_out' };      // atomowy licznik po stronie serwera
+      const r = { code:`OREO-${rnd(4)}-${rnd(4)}`, device:deviceId, nonce, status:'reserved',
+                  issuedAt:Date.now(), expiresAt:Date.now() + CONFIG.CODE_TTL_MIN*60000 };
+      s.list.push(r); save(s);
+      return { ok:true, reused:false, ...r };
+    },
+    redeem(code){ const s = load(); const r = s.list.find(x => x.code === code); if (r && r.status === 'reserved') r.status = 'redeemed'; save(s); return r; },
+    stats(){ return counts(load()); },
+    demo: {
+      setFree(n){ const s = load(); const c = counts(s); s.consumed = Math.max(0, s.poolSize - c.reserved - c.redeemed - n); save(s); },
+      expireMine(){ const s = load(); s.list.forEach(r => { if (r.device === deviceId && r.status === 'reserved') r.expiresAt = Date.now() - 1; }); save(s); },
+      reset(){ store.set(KEY, null); }
+    }
+  };
+})();
+
+/* =====================================================================
+   UI POMOCNICZE
+   ===================================================================== */
+const screens = ['start','soldout','ar','success'];
+function show(id){ screens.forEach(s => $(s).hidden = s !== id); }
+let toastT;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
+async function copyText(text, el){
+  try { await navigator.clipboard.writeText(text); toast('Skopiowano'); }
+  catch { const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Zaznaczono – skopiuj ręcznie'); }
+}
+const vibrate = p => { try { navigator.vibrate && navigator.vibrate(p); } catch {} };
+document.querySelectorAll('.sheet').forEach(sh => {
+  sh.addEventListener('click', e => { if (e.target === sh || e.target.closest('[data-close]')) sh.hidden = true; });
+});
+
+/* przeglądarka wbudowana w aplikację (Meta / TikTok) */
+const UA = navigator.userAgent || '';
+if (/FBAN|FBAV|FB_IAB|Instagram|TikTok|musical_ly|Bytedance|BytedanceWebview/i.test(UA)) $('inapp').hidden = false;
+$('copyLink').onclick = e => copyText(location.href, e.target);
+
+/* =====================================================================
+   LANDING
+   ===================================================================== */
+async function refreshPool(){
+  const a = await CodeService.availability();
+  $('poolLeft').textContent = a.free;
+  $('poolSize').textContent = a.poolSize;
+  $('soPool').textContent = a.poolSize;
+  $('poolBar').style.width = (a.free / a.poolSize * 100) + '%';
+  const mine = CodeService.mine();
+  $('mine').hidden = !mine;
+  return { a, mine };
+}
+async function enterStart(){
+  show('start');
+  const { a, mine } = await refreshPool();
+  if (a.free <= 0 && !mine) show('soldout');
+}
+$('terms').onchange = e => { $('go').disabled = !e.target.checked; };
+$('openTerms').onclick = () => $('termsSheet').hidden = false;
+$('soTerms').onclick = () => $('termsSheet').hidden = false;
+$('mine').onclick = () => { const m = CodeService.mine(); if (m) showSuccess(m, true); };
+$('go').onclick = () => startAR();
+
+/* =====================================================================
+   THREE.JS – ciastko (generyczny model zastępczy; docelowo GLB od 3D Artysty)
+   ===================================================================== */
+let THREE = null;
+async function loadThree(){ if (!THREE) THREE = await import(CONFIG.THREE); return THREE; }
+
+function waferTextures(T){
+  const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#2b1a13'; g.fillRect(0,0,S,S);
+  g.translate(S/2, S/2);
+  const ring = (r, n, size) => { for (let i=0;i<n;i++){ const a = i/n*Math.PI*2; g.beginPath(); g.arc(Math.cos(a)*r, Math.sin(a)*r, size, 0, Math.PI*2); g.fill(); } };
+  g.fillStyle = '#5a3b2c';
+  ring(232, 40, 9);
+  g.strokeStyle = '#4e3326'; g.lineWidth = 10;
+  g.beginPath(); g.arc(0,0,205,0,Math.PI*2); g.stroke();
+  for (let i=0;i<12;i++){ g.save(); g.rotate(i/12*Math.PI*2); g.beginPath(); g.ellipse(0,-140,22,48,0,0,Math.PI*2); g.fillStyle = '#4e3326'; g.fill(); g.restore(); }
+  g.beginPath(); g.arc(0,0,82,0,Math.PI*2); g.lineWidth = 12; g.stroke();
+  g.fillStyle = '#5a3b2c'; ring(46, 8, 10);
+  g.beginPath(); g.arc(0,0,16,0,Math.PI*2); g.fill();
+  const top = new T.CanvasTexture(c); top.colorSpace = T.SRGBColorSpace;
+
+  const sc = document.createElement('canvas'); sc.width = 512; sc.height = 32;
+  const sg = sc.getContext('2d'); sg.fillStyle = '#2b1a13'; sg.fillRect(0,0,512,32);
+  sg.fillStyle = '#47301f'; for (let x=0;x<512;x+=8) sg.fillRect(x,0,3,32);
+  const side = new T.CanvasTexture(sc); side.colorSpace = T.SRGBColorSpace; side.wrapS = T.RepeatWrapping; side.repeat.x = 4;
+  return { top, side, bump: new T.CanvasTexture(c) };
+}
+
+function makeCookie(T){
+  const tex = waferTextures(T);
+  const sideM = new T.MeshStandardMaterial({ map: tex.side, roughness: .85, metalness: 0 });
+  const topM = new T.MeshStandardMaterial({ map: tex.top, bumpMap: tex.bump, bumpScale: 2.5, roughness: .8 });
+  const waferGeo = new T.CylinderGeometry(1, 1, .3, 72);
+  const creamGeo = new T.CylinderGeometry(.9, .9, .22, 72);
+  const creamM = new T.MeshStandardMaterial({ color: 0xfaf4e6, roughness: .55 });
+  const group = new T.Group();
+  const bottom = new T.Mesh(waferGeo, [sideM, topM, topM]); bottom.position.y = -.26;
+  const cream = new T.Mesh(creamGeo, creamM);
+  const topPivot = new T.Group(); topPivot.position.y = .26;
+  const top = new T.Mesh(waferGeo, [sideM, topM, topM]);
+  topPivot.add(top);
+  group.add(bottom, cream, topPivot);
+  return { group, topPivot, bottom, cream };
+}
+
+function makeCrumbs(T){
+  const n = 70, pos = new Float32Array(n*3), vel = [];
+  for (let i=0;i<n;i++){ vel.push(new T.Vector3((Math.random()-.5)*2.4, Math.random()*2.6+.6, (Math.random()-.5)*2.4)); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+  const mat = new T.PointsMaterial({ size: 9, color: 0xfff6e4, transparent: true, opacity: 0, sizeAttenuation: false });
+  const pts = new T.Points(geo, mat);
+  return { pts, vel, n, t: -1 };
+}
+
+/* małe ciastko na landingu */
+(async function heroCookie(){
+  try {
+    const T = await loadThree();
+    const cv = $('heroCookie');
+    const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+    r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.setSize(260, 200, false);
+    const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 260/200, .1, 50); cam.position.set(0,0,7);
+    scene.add(new T.HemisphereLight(0xffffff, 0x223377, 1.6));
+    const d = new T.DirectionalLight(0xffffff, 2.2); d.position.set(2,4,5); scene.add(d);
+    const ck = makeCookie(T); ck.group.rotation.x = .9; ck.group.scale.setScalar(1.25); scene.add(ck.group);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (function loop(t){ if (!$('start').hidden) { ck.group.rotation.z = Math.sin(t/1400)*.15; ck.topPivot.rotation.y = reduce ? 0 : Math.sin(t/900)*.5; ck.topPivot.position.y = .26 + Math.max(0, Math.sin(t/900))*.08; r.render(scene, cam); } requestAnimationFrame(loop); })(0);
+  } catch (e) { $('heroCookie').hidden = true; }
+})();
+
+/* =====================================================================
+   AR
+   ===================================================================== */
+const AR = {
+  running:false, facing:'environment', stream:null, landmarker:null, mode:'camera',
+  renderer:null, scene:null, cam:null, cookie:null, crumbs:null,
+  W:0, H:0, net:0, prevAngle:null, smoothAngle:null, lastHandAt:0, startedAt:0, nonce:'',
+  target:{x:0,y:0,s:110}, cur:{x:0,y:0,s:110}, done:false, frames:0, fpsT:0, fps:0, lastVideoTime:-1
+};
+const C = 2*Math.PI*27;
+$('ringFg').style.strokeDasharray = C;
+
+function setStatus(text, ok){ $('statusText').textContent = text; $('statusDot').classList.toggle('ok', !!ok); }
+function setProgress(p){
+  p = Math.max(0, Math.min(1, p));
+  $('ringFg').style.strokeDashoffset = C*(1-p);
+  $('ringTxt').textContent = Math.round(p*100) + '%';
+}
+function setInstr(a, b){ $('instr').textContent = a; if (b !== undefined) $('sub').textContent = b; }
+
+async function startAR(){
+  show('ar');
+  $('loader').hidden = false;
+  Object.assign(AR, { running:true, done:false, net:0, prevAngle:null, smoothAngle:null, startedAt:performance.now(),
+    nonce: (crypto.randomUUID ? crypto.randomUUID() : String(Math.random())), lastHandAt: performance.now() });
+  setProgress(0);
+  try { await loadThree(); initScene(); }
+  catch(e){ $('loaderText').textContent = 'Nie udało się załadować grafiki 3D. Sprawdź połączenie i spróbuj ponownie.'; return; }
+
+  let camOk = false;
+  try { await startCamera(); camOk = true; }
+  catch(e){ console.warn('camera', e); }
+
+  if (camOk) {
+    $('loaderText').textContent = 'Ładuję śledzenie dłoni…';
+    try { await loadLandmarker(); }
+    catch(e){ console.warn('mediapipe', e); camOk = false; stopCamera(); }
+  }
+  $('loader').hidden = true;
+  if (camOk) enterCameraMode(); else enterTouchMode('Kamera niedostępna – odkręć ciastko palcem.');
+  requestAnimationFrame(loop);
+}
+
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(UA));
+AR.deviceId = store.get('oreoProto.cam') || null;
+
+async function startCamera(){
+  stopCamera();
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('no getUserMedia');
+  const size = { width:{ideal:1280}, height:{ideal:720} };
+  const video = AR.deviceId ? { deviceId:{ exact: AR.deviceId }, ...size }
+              : IS_MOBILE ? { facingMode: AR.facing, ...size } : size;
+  try { AR.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video }); }
+  catch (e) {
+    if (!AR.deviceId) throw e;
+    AR.deviceId = null; store.set('oreoProto.cam', null);              // zapamiętana kamera zniknęła
+    AR.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video: IS_MOBILE ? { facingMode: AR.facing, ...size } : size });
+  }
+  const track = AR.stream.getVideoTracks()[0], st = track.getSettings ? track.getSettings() : {};
+  // lustro: kamera przednia telefonu albo kamerka komputera
+  AR.mirror = st.facingMode ? st.facingMode === 'user' : !IS_MOBILE;
+  if (st.deviceId) AR.activeDeviceId = st.deviceId;
+  const v = $('video'); v.srcObject = AR.stream; v.classList.toggle('mirror', AR.mirror);
+  await v.play();
+  await new Promise(r => v.readyState >= 2 ? r() : v.onloadeddata = r);
+  fillCameraList();
+}
+
+async function fillCameraList(){
+  const sel = $('camSel');
+  try {
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    sel.innerHTML = '';
+    cams.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || `Kamera ${i+1}`; sel.appendChild(o); });
+    if (AR.activeDeviceId) sel.value = AR.activeDeviceId;
+    sel.hidden = cams.length < 2 || AR.mode !== 'camera';
+    $('flip').hidden = !IS_MOBILE || AR.mode !== 'camera';
+  } catch { sel.hidden = true; }
+}
+$('camSel').onchange = async e => {
+  AR.deviceId = e.target.value; store.set('oreoProto.cam', AR.deviceId);
+  try { await startCamera(); toast('Zmieniono kamerę'); } catch { toast('Nie udało się włączyć tej kamery'); }
+};
+function stopCamera(){ if (AR.stream) { AR.stream.getTracks().forEach(t => t.stop()); AR.stream = null; } $('video').srcObject = null; }
+
+async function loadLandmarker(){
+  if (AR.landmarker) return;
+  const vision = await import(`${CONFIG.MP}/vision_bundle.mjs`);
+  const fileset = await vision.FilesetResolver.forVisionTasks(`${CONFIG.MP}/wasm`);
+  const opts = d => ({ baseOptions:{ modelAssetPath: CONFIG.MODEL, delegate: d }, runningMode:'VIDEO', numHands:1,
+    minHandDetectionConfidence:.5, minHandPresenceConfidence:.5, minTrackingConfidence:.5 });
+  try { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('GPU')); AR.delegate = 'GPU'; }
+  catch { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('CPU')); AR.delegate = 'CPU'; }
+}
+
+function enterCameraMode(){
+  AR.mode = 'camera';
+  $('video').hidden = false; $('backdrop').hidden = true;
+  $('touchMode').hidden = false;
+  fillCameraList();
+  $('lm').hidden = !TEST.landmarks;
+  setStatus('Szukam dłoni', false);
+  setInstr('Pokaż dłoń', 'Chwyć ciastko kciukiem i palcem wskazującym, potem przekręć nadgarstek.');
+}
+function enterTouchMode(msg){
+  AR.mode = 'touch'; AR.net = 0; AR.prevAngle = null; setProgress(0);
+  stopCamera();
+  $('video').hidden = true; $('backdrop').hidden = false;
+  $('touchMode').hidden = true; $('flip').hidden = true; $('camSel').hidden = true; $('lm').hidden = true;
+  setStatus(IS_MOBILE ? 'Tryb dotykowy' : 'Tryb myszy', true);
+  if (!IS_MOBILE && !msg) msg = 'Przytrzymaj przycisk myszy i kręć kursorem dookoła ciastka.';
+  setInstr('Kręć palcem', msg || 'Kręć palcem dookoła ciastka, aby je odkręcić.');
+  AR.target = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
+}
+$('touchMode').onclick = () => enterTouchMode();
+$('flip').onclick = async () => {
+  AR.facing = AR.facing === 'environment' ? 'user' : 'environment';
+  AR.deviceId = null; store.set('oreoProto.cam', null);
+  try { await startCamera(); } catch { enterTouchMode('Nie udało się przełączyć kamery – graj palcem.'); }
+};
+$('close').onclick = () => { AR.running = false; stopCamera(); enterStart(); };
+
+function initScene(){
+  const T = THREE, cv = $('gl');
+  if (!AR.renderer) {
+    AR.renderer = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+    AR.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    AR.scene = new T.Scene();
+    AR.scene.add(new T.HemisphereLight(0xffffff, 0x334488, 1.5));
+    const d = new T.DirectionalLight(0xffffff, 2.4); d.position.set(.4, 1, 1.2); AR.scene.add(d);
+    AR.cookie = makeCookie(T); AR.scene.add(AR.cookie.group);
+    AR.crumbs = makeCrumbs(T); AR.scene.add(AR.crumbs.pts);
+    addEventListener('resize', resize);
+    bindTouch(cv);
+  }
+  resize();
+  const ck = AR.cookie; ck.topPivot.position.y = .26; ck.topPivot.rotation.set(0,0,0); ck.bottom.rotation.set(0,0,0);
+  AR.crumbs.t = -1; AR.crumbs.pts.material.opacity = 0;
+  AR.target = AR.cur = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.22 };
+  AR.cur = { ...AR.target };
+}
+function resize(){
+  const T = THREE; AR.W = innerWidth; AR.H = innerHeight;
+  AR.renderer.setSize(AR.W, AR.H, false);
+  const fov = 35, dist = (AR.H/2) / Math.tan(fov/2*Math.PI/180);
+  if (!AR.cam) AR.cam = new T.PerspectiveCamera(fov, AR.W/AR.H, 1, dist*4);
+  AR.cam.aspect = AR.W/AR.H; AR.cam.far = dist*4; AR.cam.position.set(0,0,dist); AR.cam.updateProjectionMatrix();
+}
+
+/* mapowanie znormalizowanych punktów z wideo na ekran (object-fit: cover) */
+function toScreen(nx, ny){
+  const v = $('video'), vw = v.videoWidth || 1, vh = v.videoHeight || 1;
+  const sc = Math.max(AR.W/vw, AR.H/vh), dw = vw*sc, dh = vh*sc;
+  let x = (AR.W - dw)/2 + nx*dw, y = (AR.H - dh)/2 + ny*dh;
+  if (AR.mirror) x = AR.W - x;
+  return { x, y };
+}
+const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
+
+/* akumulacja obrotu – wspólna dla dłoni i palca */
+function accumulate(angle, maxStep){
+  if (AR.prevAngle === null) { AR.prevAngle = angle; return; }
+  let d = wrap(angle - AR.prevAngle); AR.prevAngle = angle;
+  if (Math.abs(d) > maxStep || Math.abs(d) < .003) return;   // skoki trackera i drgania
+  AR.net += d;
+}
+
+function processHand(res, now){
+  const lm = res.landmarks && res.landmarks[0];
+  if (!lm) {
+    if (TEST.landmarks) clearLandmarks();
+    if (now - AR.lastHandAt > 700) { AR.net *= .96; AR.prevAngle = null; AR.smoothAngle = null; setStatus('Szukam dłoni', false); }
+    if (now - AR.lastHandAt > CONFIG.NO_HAND_HINT_MS) setInstr('Nie widzę dłoni', 'Dodaj światła i pokaż całą dłoń – albo graj palcem.');
+    return;
+  }
+  AR.lastHandAt = now;
+  setStatus('Dłoń wykryta', true);
+  const p = k => toScreen(lm[k].x, lm[k].y);
+  if (TEST.landmarks) drawLandmarks(lm.map((_, i) => p(i)));
+  const w = p(0), m9 = p(9), th = p(4), ix = p(8), a5 = p(5), a17 = p(17);
+  const handPx = Math.hypot(m9.x - w.x, m9.y - w.y);
+  // ciastko między kciukiem a palcem wskazującym
+  AR.target = { x: (th.x + ix.x)/2, y: (th.y + ix.y)/2, s: Math.max(48, Math.min(170, handPx*0.62)) };
+  // kąt przechylenia dłoni = linia podstaw palców wskazującego i małego
+  const raw = Math.atan2(a17.y - a5.y, a17.x - a5.x);
+  if (AR.smoothAngle === null) AR.smoothAngle = raw;
+  AR.smoothAngle = AR.smoothAngle + wrap(raw - AR.smoothAngle)*0.5;
+  accumulate(AR.smoothAngle, 0.6);
+  const prog = Math.abs(AR.net) / (CONFIG.TWIST_TARGET_DEG*Math.PI/180);
+  if (prog < .08) setInstr('Chwyć i przekręć', 'Obróć nadgarstek jak przy odkręcaniu słoika.');
+  else if (prog < 1) setInstr('Kręć dalej!', 'Jeszcze trochę…');
+}
+
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawLandmarks(pts){
+  const cv = $('lm'), g = cv.getContext('2d'), dpr = Math.min(devicePixelRatio, 2);
+  if (cv.width !== AR.W*dpr) { cv.width = AR.W*dpr; cv.height = AR.H*dpr; }
+  g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,AR.W,AR.H);
+  g.strokeStyle = 'rgba(61,220,151,.9)'; g.lineWidth = 2.5;
+  BONES.forEach(([a,b]) => { g.beginPath(); g.moveTo(pts[a].x, pts[a].y); g.lineTo(pts[b].x, pts[b].y); g.stroke(); });
+  pts.forEach((q, i) => { g.beginPath(); g.arc(q.x, q.y, i === 5 || i === 17 ? 6 : 3.5, 0, Math.PI*2); g.fillStyle = i === 5 || i === 17 ? '#ffcf4a' : '#fff'; g.fill(); });
+  g.strokeStyle = '#ffcf4a'; g.lineWidth = 3; g.beginPath(); g.moveTo(pts[5].x, pts[5].y); g.lineTo(pts[17].x, pts[17].y); g.stroke();
+  g.fillStyle = '#fff'; g.font = '600 13px system-ui'; g.fillText(`obrót: ${Math.round(Math.abs(AR.net)*180/Math.PI)}° / ${CONFIG.TWIST_TARGET_DEG}°`, 16, AR.H - 190);
+}
+function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
+
+function bindTouch(cv){
+  let active = false;
+  cv.addEventListener('pointerdown', e => { if (AR.mode !== 'touch' || AR.done) return; active = true; AR.prevAngle = null; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    if (!active || AR.mode !== 'touch' || AR.done) return;
+    accumulate(Math.atan2(e.clientY - AR.cur.y, e.clientX - AR.cur.x), 1.2);
+  });
+  const end = () => { active = false; AR.prevAngle = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+}
+
+function loop(now){
+  if (!AR.running) return;
+  // śledzenie dłoni
+  if (AR.mode === 'camera' && AR.landmarker && !AR.done) {
+    const v = $('video');
+    if (v.readyState >= 2 && v.currentTime !== AR.lastVideoTime) {
+      AR.lastVideoTime = v.currentTime;
+      try { processHand(AR.landmarker.detectForVideo(v, now), now); } catch(e){ console.warn(e); }
+      AR.frames++;
+    }
+    if (now - AR.fpsT > 1000) { AR.fps = AR.frames; AR.frames = 0; AR.fpsT = now; }
+  }
+  const target = (AR.mode === 'touch' ? CONFIG.TOUCH_TARGET_DEG : CONFIG.TWIST_TARGET_DEG) * Math.PI/180;
+  const prog = Math.min(1, Math.abs(AR.net)/target);
+  if (!AR.done) setProgress(prog);
+  if (!AR.done && prog >= 1) win();
+
+  // pozycja ciastka (wygładzona)
+  const k = AR.mode === 'camera' ? .35 : .2;
+  AR.cur.x += (AR.target.x - AR.cur.x)*k; AR.cur.y += (AR.target.y - AR.cur.y)*k; AR.cur.s += (AR.target.s - AR.cur.s)*k;
+  const ck = AR.cookie, g = ck.group;
+  g.position.set(AR.cur.x - AR.W/2, AR.H/2 - AR.cur.y, 0);
+  g.scale.setScalar(AR.cur.s);
+  g.rotation.x = .95; g.rotation.z = Math.sin(now/1300)*.08;
+  const spin = Math.sign(AR.net || 1);
+  if (!AR.done) {
+    ck.topPivot.rotation.y = AR.net*1.5;
+    ck.bottom.rotation.y = -AR.net*.15;
+    ck.topPivot.position.y = .26 + prog*.12;
+  } else {
+    const t = Math.min(1, (now - AR.doneAt)/700), e = 1 - Math.pow(1-t, 3);
+    ck.topPivot.position.y = .26 + .12 + e*1.1;
+    ck.topPivot.rotation.x = -e*.6; ck.topPivot.rotation.y += .12*spin*(1-t);
+  }
+  // okruszki
+  const cr = AR.crumbs;
+  if (cr.t >= 0) {
+    cr.t += 1/60;
+    const a = cr.pts.geometry.attributes.position;
+    for (let i=0;i<cr.n;i++){
+      const vv = cr.vel[i];
+      a.setXYZ(i, g.position.x + vv.x*cr.t*AR.cur.s, g.position.y + (vv.y*cr.t - 2.2*cr.t*cr.t)*AR.cur.s, vv.z*cr.t*AR.cur.s);
+    }
+    a.needsUpdate = true;
+    cr.pts.material.opacity = Math.max(0, 1 - cr.t/1.2);
+  }
+  AR.renderer.render(AR.scene, AR.cam);
+  requestAnimationFrame(loop);
+}
+
+async function win(){
+  AR.done = true; AR.doneAt = performance.now();
+  setProgress(1); vibrate([30,40,60]);
+  AR.crumbs.t = 0; AR.crumbs.pts.material.opacity = 1;
+  setInstr('Odkręcone!', 'Sprawdzam, czy jest jeszcze paczka dla Ciebie…');
+  const f = $('flash'); f.style.opacity = .55; setTimeout(() => f.style.opacity = 0, 180);
+  const [res] = await Promise.all([
+    CodeService.reserve({ nonce: AR.nonce, startedAt: Date.now() - (performance.now() - AR.startedAt) }),
+    new Promise(r => setTimeout(r, 1100))
+  ]);
+  AR.running = false; stopCamera();
+  if (res.ok) showSuccess(res, res.reused);
+  else if (res.error === 'sold_out') { show('soldout'); }
+  else { toast('Za szybko – spróbuj jeszcze raz'); startAR(); }
+}
+
+/* =====================================================================
+   SUKCES
+   ===================================================================== */
+let ttlTimer, currentCode = null;
+function showSuccess(r, reused){
+  show('success');
+  currentCode = r.code;
+  $('code').textContent = r.code;
+  $('succTitle').textContent = r.status === 'redeemed' ? 'Odebrane!' : (reused ? 'Masz już kod' : 'Zgarnięte!');
+  $('succLead').textContent = r.status === 'redeemed' ? 'Ten kod został już zrealizowany w Lisku. Smacznego!'
+    : (reused ? 'Jedno urządzenie zgarnia jeden kod dziennie – oto Twój.' : 'Twoje darmowe Oreo czeka w Lisku.');
+  $('toLisek').hidden = r.status === 'redeemed';
+  clearInterval(ttlTimer);
+  const tick = () => {
+    if (r.status === 'redeemed') { $('ttl').textContent = 'zrealizowany'; return; }
+    const ms = r.expiresAt - Date.now();
+    if (ms <= 0) { $('ttl').textContent = 'wygasł'; clearInterval(ttlTimer); $('toLisek').hidden = true; $('succLead').textContent = 'Kod wygasł i wrócił do puli. Możesz zagrać ponownie.'; return; }
+    const m = Math.floor(ms/60000), s = Math.floor(ms%60000/1000);
+    $('ttl').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  };
+  tick(); ttlTimer = setInterval(tick, 1000);
+}
+$('copyCode').onclick = () => copyText($('code').textContent, $('code'));
+$('toLisek').onclick = () => { $('deeplink').textContent = CONFIG.LISEK_DEEPLINK(currentCode); $('liskSheet').hidden = false; };
+$('simRedeem').onclick = () => { const r = CodeService.redeem(currentCode); $('liskSheet').hidden = true; if (r) showSuccess(r, true); toast('Kod zrealizowany w Lisku'); };
+
+/* =====================================================================
+   PANEL DEMO
+   ===================================================================== */
+function renderStats(){
+  const s = CodeService.stats();
+  $('stFree').textContent = s.free; $('stRes').textContent = s.reserved; $('stRed').textContent = s.redeemed; $('stExp').textContent = s.expired;
+  $('dmFps').textContent = AR.landmarker ? `Śledzenie dłoni: ${AR.delegate}, ${AR.fps} kl./s` : 'Śledzenie dłoni: nieuruchomione';
+}
+$('demoBtn').onclick = () => { renderStats(); $('demoSheet').hidden = false; };
+const afterDemo = () => { renderStats(); if (!$('start').hidden || !$('soldout').hidden) enterStart(); };
+function fullReset(){ CodeService.demo.reset(); clearInterval(ttlTimer); }
+$('again').onclick = () => { fullReset(); toast('Zresetowano – nowy kod przy następnej grze'); startAR(); };
+$('optNoLimit').checked = TEST.noLimit; $('optLm').checked = TEST.landmarks;
+$('optNoLimit').onchange = e => { TEST.noLimit = e.target.checked; saveTest(); };
+$('optLm').onchange = e => { TEST.landmarks = e.target.checked; saveTest(); if (AR.mode === 'camera') { $('lm').hidden = !TEST.landmarks; clearLandmarks(); } };
+if (location.hash === '#reset') { fullReset(); history.replaceState(null, '', location.pathname + location.search); setTimeout(() => toast('Zresetowano test'), 300); }
+if (!IS_MOBILE) $('touchMode').textContent = 'Nie widzi dłoni? Graj myszą';
+$('dmZero').onclick = () => { CodeService.demo.setFree(0); afterDemo(); toast('Pula wyczerpana'); };
+$('dmThree').onclick = () => { CodeService.demo.setFree(3); afterDemo(); toast('Zostały 3 kody'); };
+$('dmExpire').onclick = () => { CodeService.demo.expireMine(); afterDemo(); toast('Twój kod wygasł'); if (!$('success').hidden) enterStart(); };
+$('dmReset').onclick = () => { CodeService.demo.reset(); afterDemo(); toast('Nowy dzień, pula 300'); if (!$('success').hidden) enterStart(); };
+
+enterStart();
+</script>
+</body>
+</html>
