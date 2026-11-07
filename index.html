@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f9f">
 <title>Zgarnij Oreo – prototyp WebAR</title>
+<meta name="description" content="Odkręć ciastko Oreo gestem dłoni w AR i zgarnij kod na darmowe opakowanie w aplikacji Lisek. Codziennie 300 paczek.">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Zgarnij Oreo do obiadku!">
+<meta property="og:description" content="Odkręć ciastko w AR i odbierz darmowe Oreo w aplikacji Lisek.">
+<meta property="og:image" content="https://verekagames.github.io/webar-twist-prototype/assets/og.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b2f9f'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%232a1812'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%2374503b' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2374503b'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="assets/lisek-app.png">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap">
@@ -90,14 +101,40 @@ img{max-width:100%}
 .steps3 strong{color:var(--milk);font-size:13.5px}
 
 .cta{display:flex;flex-direction:column;gap:12px}
+.play{display:flex;flex-direction:column;gap:18px}
+.qr{display:none}
+.desk .qr{display:flex;gap:16px;align-items:center;padding:14px;border-radius:16px;background:rgba(255,255,255,.06);border:1.5px dashed var(--blue-line)}
+.qr img{width:104px;height:104px;border-radius:10px;flex:none;image-rendering:pixelated}
+.qr b{display:block;font-size:15px;margin-bottom:2px}
+.qr span{font-size:13.5px;color:var(--muted);line-height:1.4}
+@media (min-width:960px){
+  #start .wrap{max-width:1120px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);grid-template-areas:"top top" "hero play" "steps play" "note play";column-gap:64px;row-gap:28px;align-content:center;padding-top:32px}
+  #start .topbar{grid-area:top}
+  #start .hero{grid-area:hero;align-items:flex-start;text-align:left;align-self:end}
+  #start .hero .l1,#start .hero .l3{font-size:clamp(56px,5.6vw,92px);white-space:nowrap}
+  #start .hero .logo{width:min(100%,500px);margin:2px 0 4px -6px}
+  #start .steps3{grid-area:steps;align-self:start}
+  #start .note{grid-area:note;text-align:left;align-self:end}
+  #start .play{grid-area:play;align-self:center;padding:24px;border-radius:28px;background:rgba(6,26,94,.55);border:1.5px solid var(--blue-line);box-shadow:0 30px 60px rgba(3,12,48,.35)}
+  #start .stage-cookie{height:240px}
+  #start .stage-cookie canvas,#start .stage-cookie img{height:232px}
+  #success .wrap,#soldout .wrap{max-width:520px}
+}
 .consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);line-height:1.4}
-.consent input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--cream)}
+.consent input{-webkit-appearance:none;appearance:none;width:26px;height:26px;margin:0;flex:none;border-radius:8px;border:2px solid var(--milk);background:rgba(255,255,255,.08) center/18px no-repeat;cursor:pointer;transition:background-color .15s,transform .15s}
+.consent input:checked{background-color:var(--milk);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230b2f9f' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
+.consent input:active{transform:scale(.9)}
+.consent.nudge{animation:nudge .45s ease}
+.consent.nudge input{border-color:var(--warn);box-shadow:0 0 0 4px rgba(255,207,74,.35)}
+@keyframes nudge{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.hint{margin:-4px 0 0;font-size:13px;font-weight:700;color:var(--warn);text-align:center;min-height:0}
 .consent button{background:none;border:0;padding:0;color:var(--milk);text-decoration:underline;font-size:inherit}
 .note{font-size:12px;color:var(--muted);margin:0;text-align:center;opacity:.85}
 
 .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;border:0;border-radius:999px;background:var(--milk);color:var(--blue);font-weight:800;font-size:17px;padding:0 24px;transition:transform .12s,opacity .2s,box-shadow .2s;box-shadow:0 10px 24px rgba(3,12,48,.35)}
 .btn:active{transform:scale(.97)}
 .btn[disabled]{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn[aria-disabled="true"]{background:rgba(255,255,255,.72)}
 .btn.ghost{background:transparent;color:var(--milk);border:1.5px solid var(--blue-line);box-shadow:none}
 .btn.small{min-height:44px;font-size:14.5px;width:auto;font-weight:700}
 .btn.lisek{background:var(--lisek);color:var(--milk);justify-content:space-between;padding:0 10px 0 22px}
@@ -145,6 +182,14 @@ img{max-width:100%}
 .loader .logo{width:200px;height:auto;margin:0 auto}
 .spin{width:46px;height:46px;border-radius:50%;border:4px solid var(--blue-line);border-top-color:var(--milk);animation:spin .9s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
+.coach{position:absolute;left:50%;top:42%;width:150px;height:150px;margin:-75px 0 0 -75px;pointer-events:none;opacity:0;transition:opacity .4s;z-index:2}
+.coach.on{opacity:1}
+.coach svg{width:100%;height:100%;transform-origin:50% 78%;animation:coach 2.2s cubic-bezier(.45,0,.55,1) infinite;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35))}
+.coach .fing{display:none}
+.coach.finger #coachSvg{display:none}
+.coach.finger .fing{display:block;transform-origin:50% 50%;animation:orbit 1.8s linear infinite}
+@keyframes coach{0%,100%{transform:rotate(-32deg)}50%{transform:rotate(32deg)}}
+@keyframes orbit{to{transform:rotate(360deg)}}
 .flash{position:absolute;inset:0;background:var(--cream);opacity:0;pointer-events:none;transition:opacity .35s}
 
 /* sukces – kupon */
@@ -229,6 +274,7 @@ img{max-width:100%}
       <img class="logo" src="assets/oreo-logo.png" alt="" width="330" height="124">
       <span class="l3">do obiadku!</span>
     </h1>
+    <div class="play">
     <div class="stage-cookie">
       <span class="crumb" style="left:16%;top:22%"></span>
       <span class="crumb" style="right:18%;top:30%;animation-delay:-1.6s;width:5px;height:5px"></span>
@@ -242,8 +288,14 @@ img{max-width:100%}
     </div>
     <div class="cta">
       <label class="consent" for="terms"><input type="checkbox" id="terms"><span>Akceptuję <button type="button" id="openTerms">regulamin akcji</button> i chcę wziąć udział.</span></label>
-      <button class="btn" id="go" disabled>Włącz kamerę i graj</button>
+      <button class="btn" id="go" aria-disabled="true" aria-describedby="goHint">Włącz kamerę i graj</button>
+      <p class="hint" id="goHint" aria-live="polite"></p>
       <button class="btn ghost small" id="mine" hidden style="align-self:center">Pokaż mój kod</button>
+    </div>
+    <div class="qr" aria-label="Otwórz na telefonie">
+      <img src="assets/qr.png" alt="Kod QR do tej strony" width="104" height="104">
+      <div><b>Najlepiej działa na telefonie</b><span>Zeskanuj kod aparatem telefonu. Na komputerze zagrasz kamerką albo myszą.</span></div>
+    </div>
     </div>
     <ol class="steps3">
       <li><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></span><strong>Odkręć</strong>ciastko gestem dłoni</li>
@@ -277,6 +329,7 @@ img{max-width:100%}
   <video id="video" playsinline muted autoplay></video>
   <canvas class="gl" id="gl"></canvas>
   <canvas id="lm" hidden></canvas>
+  <div class="coach" id="coach" aria-hidden="true"><svg id="coachSvg" viewBox="0 0 120 120"><g class="hand" fill="#fff" stroke="#0b2f9f" stroke-width="3" stroke-linejoin="round"><rect x="37" y="18" width="13" height="44" rx="6.5"/><rect x="52" y="12" width="13" height="50" rx="6.5"/><rect x="67" y="17" width="13" height="45" rx="6.5"/><rect x="82" y="28" width="12" height="38" rx="6"/><path d="M36 54c0-3 3-5 6-5h46c4 0 7 3 7 7v14c0 17-12 30-29 30h-4c-12 0-21-7-25-17l-9-20c-2-4 1-8 5-8 3 0 5 2 6 4z"/><rect x="18" y="58" width="13" height="30" rx="6.5" transform="rotate(-38 24 73)"/></g></svg><svg class="fing" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="3" stroke-dasharray="4 9" stroke-linecap="round"/><circle cx="60" cy="8" r="9" fill="#fff" stroke="#0b2f9f" stroke-width="3"/></svg></div>
   <div class="flash" id="flash"></div>
   <div class="hud-top">
     <span class="chip"><i class="dot" id="statusDot"></i><span id="statusText">Uruchamiam…</span></span>
@@ -284,6 +337,7 @@ img{max-width:100%}
     <span class="right">
       <select class="camsel" id="camSel" aria-label="Wybierz kamerę" hidden></select>
       <button class="iconbtn" id="flip" aria-label="Przełącz kamerę" title="Przełącz kamerę"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l2-3h6l2 3h4v12H3z"/><path d="M9 13a3 3 0 0 0 5.6 1.5M15 12a3 3 0 0 0-5.6-1.5"/><path d="M14.5 15.5V14H16M9.5 8.5V10H8"/></svg></button>
+      <button class="iconbtn" id="mute" aria-label="Wycisz dźwięk" aria-pressed="false" title="Dźwięk"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="muteX" d="M17 9l5 6M22 9l-5 6" hidden/></svg></button>
       <button class="iconbtn" id="close" aria-label="Zamknij" title="Zamknij"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </span>
   </div>
@@ -494,6 +548,43 @@ document.querySelectorAll('.sheet').forEach(sh => {
   sh.addEventListener('click', e => { if (e.target === sh || e.target.closest('[data-close]')) sh.hidden = true; });
 });
 
+/* dźwięk syntetyzowany w Web Audio (zero plików): zapadka przy kręceniu, „pop” i akord przy sukcesie */
+const Sound = (() => {
+  let ctx = null, muted = !!store.get('oreoProto.muted');
+  const ensure = () => { try { if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (C) ctx = new C(); } if (ctx && ctx.state === 'suspended') ctx.resume(); } catch {} return ctx; };
+  const ok = () => ctx && !muted && ctx.state === 'running';
+  function click(pitch){
+    if (!ok()) return;
+    const t = ctx.currentTime, n = Math.floor(ctx.sampleRate*.028), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 4);
+    const src = ctx.createBufferSource(); src.buffer = b;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400*pitch; f.Q.value = 5;
+    const g = ctx.createGain(); g.gain.value = .55;
+    src.connect(f).connect(g).connect(ctx.destination); src.start(t);
+  }
+  function tone(freq, t0, dur, vol){
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + .012); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + dur + .02);
+  }
+  function win(){
+    if (!ok()) return;
+    const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(560, t); o.frequency.exponentialRampToValueAtTime(130, t + .13);
+    g.gain.setValueAtTime(.45, t); g.gain.exponentialRampToValueAtTime(.0001, t + .16);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + .17);
+    [659.25, 783.99, 1046.5, 1318.5].forEach((fq, i) => tone(fq, t + .14 + i*.075, .42, .16));
+  }
+  return { ensure, click, win, get muted(){ return muted; }, set muted(v){ muted = v; store.set('oreoProto.muted', v); } };
+})();
+function renderMute(){
+  const m = Sound.muted;
+  $('mute').setAttribute('aria-pressed', String(m)); $('mute').setAttribute('aria-label', m ? 'Włącz dźwięk' : 'Wycisz dźwięk');
+  $('muteWave').toggleAttribute('hidden', m); $('muteX').toggleAttribute('hidden', !m);
+}
+$('mute').onclick = () => { Sound.ensure(); Sound.muted = !Sound.muted; renderMute(); if (!Sound.muted) Sound.click(1); };
+renderMute();
+
 /* przeglądarka wbudowana w aplikację (Meta / TikTok) */
 const UA = navigator.userAgent || '';
 if (/FBAN|FBAV|FB_IAB|Instagram|TikTok|musical_ly|Bytedance|BytedanceWebview/i.test(UA)) $('inapp').hidden = false;
@@ -527,63 +618,122 @@ async function enterStart(){
   if (a.free <= 0 && !mine) { show('soldout'); startSoldoutCountdown(); }
 }
 $('terms').onchange = e => {
-  $('go').disabled = !e.target.checked;
-  if (e.target.checked) { loadThree().catch(() => {}); loadLandmarker().catch(() => {}); }   // rozgrzewka: AR startuje szybciej
+  $('go').setAttribute('aria-disabled', String(!e.target.checked));
+  if (e.target.checked) { $('goHint').textContent = ''; loadThree().catch(() => {}); loadLandmarker().catch(() => {}); }   // rozgrzewka: AR startuje szybciej
 };
 $('openTerms').onclick = () => $('termsSheet').hidden = false;
 $('soTerms').onclick = () => $('termsSheet').hidden = false;
 $('mine').onclick = () => { const m = CodeService.mine(); if (m) showSuccess(m, true); };
-$('go').onclick = () => startAR();
+$('go').onclick = () => {
+  if (!$('terms').checked) {
+    const row = $('terms').closest('.consent'); row.classList.remove('nudge'); void row.offsetWidth; row.classList.add('nudge');
+    $('goHint').textContent = 'Najpierw zaznacz zgodę na regulamin.'; $('terms').focus(); vibrate(20);
+    return;
+  }
+  Sound.ensure(); startAR();
+};
 
 /* =====================================================================
    THREE.JS – ciastko (generyczny model zastępczy; docelowo GLB od 3D Artysty)
    ===================================================================== */
 let THREE = null;
-async function loadThree(){ if (!THREE) THREE = await import(CONFIG.THREE); return THREE; }
+let ROOMENV = null;
+async function loadThree(){
+  if (!THREE) THREE = await import('three');
+  if (!ROOMENV) { try { ROOMENV = (await import('three/addons/environments/RoomEnvironment.js')).RoomEnvironment; } catch (e) { ROOMENV = false; } }
+  return THREE;
+}
+/* oświetlenie studyjne: odbicia z RoomEnvironment, ciepłe światło kluczowe, chłodna kontra od tła */
+function stageLights(T, renderer, scene){
+  renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  if (ROOMENV) { const pm = new T.PMREMGenerator(renderer); scene.environment = pm.fromScene(new ROOMENV(), .04).texture; pm.dispose(); }
+  scene.add(new T.HemisphereLight(0xfff4e6, 0x1a3a9a, ROOMENV ? .55 : 1.4));
+  const key = new T.DirectionalLight(0xfff1dc, 2.2); key.position.set(1.5, 3, 4); scene.add(key);
+  const rim = new T.DirectionalLight(0x8fd3ff, 1.6); rim.position.set(-2, 1.2, -2.5); scene.add(rim);
+}
 
-/* tekstury rysowane raz i współdzielone (pewne ładowanie, mniej pamięci GPU) */
+/* Ciastko proceduralne (wzór generyczny, nie odwzorowuje tłoczenia marki – docelowo GLB od 3D Artysty).
+   Mapa wysokości -> kolor z cieniowaniem rowków + mapa normalnych (Sobel) = realne tłoczenie w świetle. */
 let TEXCANVAS = null;
 function textureCanvases(){
   if (TEXCANVAS) return TEXCANVAS;
-  const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2a1812'; g.fillRect(0,0,S,S);
-  g.translate(S/2, S/2);
+  const S = 512;
+  // 1) mapa wysokości wzoru
+  const h = document.createElement('canvas'); h.width = h.height = S;
+  const g = h.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0,0,S,S);
+  g.translate(S/2, S/2); g.fillStyle = '#fff'; g.strokeStyle = '#fff';
   const ring = (r, n, size) => { for (let i=0;i<n;i++){ const a = i/n*Math.PI*2; g.beginPath(); g.arc(Math.cos(a)*r, Math.sin(a)*r, size, 0, Math.PI*2); g.fill(); } };
-  const raised = '#74503b', mid = '#5f3f2e';
-  g.fillStyle = raised; ring(232, 40, 9);
-  g.strokeStyle = mid; g.lineWidth = 10; g.beginPath(); g.arc(0,0,205,0,Math.PI*2); g.stroke();
-  g.fillStyle = raised;
-  for (let i=0;i<12;i++){ g.save(); g.rotate(i/12*Math.PI*2); g.beginPath(); g.ellipse(0,-140,22,48,0,0,Math.PI*2); g.fill(); g.restore(); }
-  g.strokeStyle = raised; g.lineWidth = 12; g.beginPath(); g.arc(0,0,82,0,Math.PI*2); g.stroke();
-  ring(46, 8, 10); g.beginPath(); g.arc(0,0,16,0,Math.PI*2); g.fill();
-  const sc = document.createElement('canvas'); sc.width = 512; sc.height = 32;
-  const sg = sc.getContext('2d'); sg.fillStyle = '#2a1812'; sg.fillRect(0,0,512,32);
-  sg.fillStyle = '#5a3a28'; for (let x=0;x<512;x+=8) sg.fillRect(x,0,3,32);
-  return TEXCANVAS = { face: c, side: sc };
+  ring(236, 44, 8);
+  g.lineWidth = 9; g.beginPath(); g.arc(0,0,212,0,Math.PI*2); g.stroke();
+  for (let i=0;i<12;i++){ g.save(); g.rotate(i/12*Math.PI*2); g.beginPath(); g.ellipse(0,-142,21,47,0,0,Math.PI*2); g.fill(); g.restore(); }
+  g.lineWidth = 11; g.beginPath(); g.arc(0,0,82,0,Math.PI*2); g.stroke();
+  ring(48, 8, 9.5); g.beginPath(); g.arc(0,0,16,0,Math.PI*2); g.fill();
+  g.setTransform(1,0,0,1,0,0);
+  // zmiękczenie krawędzi tłoczenia
+  const hs = document.createElement('canvas'); hs.width = hs.height = S;
+  const hg = hs.getContext('2d'); hg.filter = 'blur(2.2px)'; hg.drawImage(h, 0, 0);
+  const H = hg.getImageData(0,0,S,S).data;
+  // 2) kolor: kakaowe tło, wypukłości jaśniejsze, drobny szum wypieku
+  const col = document.createElement('canvas'); col.width = col.height = S;
+  const cg = col.getContext('2d'), cd = cg.createImageData(S,S);
+  const lo = [40, 23, 17], hi = [92, 61, 44];
+  // 3) normalne z gradientu wysokości
+  const nm = document.createElement('canvas'); nm.width = nm.height = S;
+  const ng = nm.getContext('2d'), nd = ng.createImageData(S,S);
+  const at = (x,y) => H[(((y+S)%S)*S + ((x+S)%S))*4] / 255;
+  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+    const i = (y*S+x)*4, v = at(x,y), n = (Math.random()-.5)*10;
+    for (let c=0;c<3;c++) cd.data[i+c] = Math.max(0, Math.min(255, lo[c] + (hi[c]-lo[c])*v + n));
+    cd.data[i+3] = 255;
+    const dx = (at(x+1,y-1) + 2*at(x+1,y) + at(x+1,y+1)) - (at(x-1,y-1) + 2*at(x-1,y) + at(x-1,y+1));
+    const dy = (at(x-1,y+1) + 2*at(x,y+1) + at(x+1,y+1)) - (at(x-1,y-1) + 2*at(x,y-1) + at(x+1,y-1));
+    const k = 2.2, nx = -dx*k, ny = dy*k, nz = 1, l = Math.hypot(nx, ny, nz);
+    nd.data[i] = (nx/l*.5+.5)*255; nd.data[i+1] = (ny/l*.5+.5)*255; nd.data[i+2] = (nz/l*.5+.5)*255; nd.data[i+3] = 255;
+  }
+  cg.putImageData(cd,0,0); ng.putImageData(nd,0,0);
+  // 4) bok: drobne pionowe żłobienia jako mapa normalnych + kolor
+  const sn = document.createElement('canvas'); sn.width = 64; sn.height = 4;
+  const sg = sn.getContext('2d'), sd = sg.createImageData(64,4);
+  for (let x=0;x<64;x++){ const nx = Math.sin(x/64*Math.PI*2)*.55, l = Math.hypot(nx,1);
+    for (let y=0;y<4;y++){ const i=(y*64+x)*4; sd.data[i]=(nx/l*.5+.5)*255; sd.data[i+1]=128; sd.data[i+2]=(1/l*.5+.5)*255; sd.data[i+3]=255; } }
+  sg.putImageData(sd,0,0);
+  return TEXCANVAS = { face: col, faceN: nm, sideN: sn };
 }
 function waferTextures(T, renderer){
   const cv = textureCanvases();
   const aniso = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
-  const top = new T.CanvasTexture(cv.face); top.colorSpace = T.SRGBColorSpace; top.anisotropy = aniso; top.needsUpdate = true;
-  const bump = new T.CanvasTexture(cv.face); bump.needsUpdate = true;
-  const side = new T.CanvasTexture(cv.side); side.colorSpace = T.SRGBColorSpace; side.wrapS = T.RepeatWrapping; side.repeat.x = 4; side.needsUpdate = true;
-  return { top, side, bump };
+  const face = new T.CanvasTexture(cv.face); face.colorSpace = T.SRGBColorSpace; face.anisotropy = aniso;
+  const faceN = new T.CanvasTexture(cv.faceN); faceN.anisotropy = aniso;
+  const sideN = new T.CanvasTexture(cv.sideN); sideN.wrapS = sideN.wrapT = T.RepeatWrapping; sideN.repeat.set(70, 1);
+  [face, faceN, sideN].forEach(t => t.needsUpdate = true);
+  return { face, faceN, sideN };
 }
 
 function makeCookie(T, renderer){
   const tex = waferTextures(T, renderer);
-  const sideM = new T.MeshStandardMaterial({ map: tex.side, roughness: .85, metalness: 0 });
-  const topM = new T.MeshStandardMaterial({ map: tex.top, bumpMap: tex.bump, bumpScale: 3, roughness: .75 });
-  const waferGeo = new T.CylinderGeometry(1, 1, .3, 72);
-  const creamGeo = new T.CylinderGeometry(.9, .9, .22, 72);
-  const creamM = new T.MeshStandardMaterial({ color: 0xfaf4e6, roughness: .55 });
+  const R = 1, h = .15, f = .07;                       // promień, pół grubości, zaokrąglenie krawędzi
+  const faceM = new T.MeshStandardMaterial({ map: tex.face, normalMap: tex.faceN, normalScale: new T.Vector2(1.1, 1.1), roughness: .82, metalness: 0, envMapIntensity: .5 });
+  const sideM = new T.MeshStandardMaterial({ color: 0x3a2219, normalMap: tex.sideN, normalScale: new T.Vector2(.9, .9), roughness: .88, envMapIntensity: .45 });
+  // bok z zaokrąglonymi krawędziami
+  const prof = [];
+  for (let i=0;i<=6;i++){ const a = Math.PI/2 - i/6*Math.PI/2; prof.push(new T.Vector2(R - f + Math.cos(a)*f, h - f + Math.sin(a)*f)); }
+  for (let i=0;i<=6;i++){ const a = -i/6*Math.PI/2; prof.push(new T.Vector2(R - f + Math.cos(a)*f, -h + f + Math.sin(a)*f)); }
+  const sideGeo = new T.LatheGeometry(prof.reverse(), 96);
+  const capGeo = new T.CircleGeometry(R - f, 96);
+  const wafer = () => {
+    const w = new T.Group();
+    const top = new T.Mesh(capGeo, faceM); top.rotation.x = -Math.PI/2; top.position.y = h;
+    const bot = new T.Mesh(capGeo, faceM); bot.rotation.x = Math.PI/2; bot.position.y = -h;
+    w.add(top, bot, new T.Mesh(sideGeo, sideM));
+    return w;
+  };
+  // krem: lekko wybrzuszony, matowo-satynowy
+  const cp = [new T.Vector2(0, .11), new T.Vector2(.86, .11), new T.Vector2(.915, .07), new T.Vector2(.93, 0), new T.Vector2(.915, -.07), new T.Vector2(.86, -.11), new T.Vector2(0, -.11)].reverse();
+  const cream = new T.Mesh(new T.LatheGeometry(cp, 96), new T.MeshStandardMaterial({ color: 0xf7f0e2, roughness: .48, envMapIntensity: .8 }));
   const group = new T.Group();
-  const bottom = new T.Mesh(waferGeo, [sideM, topM, topM]); bottom.position.y = -.26;
-  const cream = new T.Mesh(creamGeo, creamM);
-  const topPivot = new T.Group(); topPivot.position.y = .26;
-  const top = new T.Mesh(waferGeo, [sideM, topM, topM]);
-  topPivot.add(top);
+  const bottom = wafer(); bottom.position.y = -.26;
+  const topPivot = new T.Group(); topPivot.position.y = .26; topPivot.add(wafer());
   group.add(bottom, cream, topPivot);
   return { group, topPivot, bottom, cream, textures: Object.values(tex) };
 }
@@ -606,8 +756,7 @@ function makeCrumbs(T){
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
     r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.setSize(320, 240, false);
     const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 320/240, .1, 50); cam.position.set(0,0,7);
-    scene.add(new T.HemisphereLight(0xffffff, 0x223377, 1.6));
-    const d = new T.DirectionalLight(0xffffff, 2.4); d.position.set(2,4,5); scene.add(d);
+    stageLights(T, r, scene);
     const ck = makeCookie(T, r); ck.group.rotation.set(.9, 0, -.12); ck.group.scale.setScalar(1.25);
     ck.topPivot.position.y = .36; ck.topPivot.rotation.y = .4; scene.add(ck.group);
     r.render(scene, cam);
@@ -652,7 +801,9 @@ async function connectCamera(){
   const camErr = await startCamera().then(st => { stream = st; return null; }, e => e);
   if (camErr) return { camErr };
   $('loaderText').textContent = 'Ładuję śledzenie dłoni…';
-  const mpErr = await withTimeout(loadLandmarker(), 25000).then(() => null, e => e);
+  const iv = setInterval(() => { const p = AR.mpProgress || 0; if (p > 0 && p < 1) $('loaderText').textContent = `Ładuję śledzenie dłoni… ${Math.round(p*100)}%`; else if (p >= 1) $('loaderText').textContent = 'Uruchamiam śledzenie dłoni…'; }, 150);
+  const mpErr = await withTimeout(loadLandmarker(), 30000).then(() => null, e => e);
+  clearInterval(iv);
   return { mpErr, stream };
 }
 function applyConnect(gen, r){
@@ -695,7 +846,7 @@ function camMessage(e){
   return 'Kamera niedostępna – odkręć ciastko palcem.';
 }
 const CHANNELS = ['palm'];
-function resetTwist(){ AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); AR.prevPts = null; AR.orient = 0; AR.handSince = 0; AR.prevPalm = null; AR.signed = 0; }
+function resetTwist(){ AR.lastTick = 0; AR.seenHand = false; AR.net = 0; AR.prevAngle = null; AR.ch = {}; CHANNELS.forEach(k => AR.ch[k] = newChannel()); AR.prevPts = null; AR.orient = 0; AR.handSince = 0; AR.prevPalm = null; AR.signed = 0; }
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(UA) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(UA));
 AR.deviceId = store.get('oreoProto.cam') || null;
@@ -781,13 +932,27 @@ $('camSel').onchange = async e => {
 };
 function stopCamera(){ keepAwake(false); if (AR.stream) { AR.stream.getTracks().forEach(t => { t.onended = null; t.stop(); }); AR.stream = null; } const v = $('video'); try { v.pause(); } catch {} v.srcObject = null; }
 
+/* pobranie modelu z paskiem postępu (ok. 7,5 MB) */
+async function fetchWithProgress(url, onProgress){
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+  const total = +res.headers.get('content-length') || 7.8e6, reader = res.body.getReader(), parts = [];
+  let got = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); got += value.length; onProgress(Math.min(.99, got/total)); }
+  const out = new Uint8Array(got); let o = 0; parts.forEach(p => { out.set(p, o); o += p.length; });
+  onProgress(1);
+  return out;
+}
 async function loadLandmarker(){
   if (AR.landmarker) return;
   if (AR.lmPromise) return AR.lmPromise;
   AR.lmPromise = (async () => {
   const vision = await import(`${CONFIG.MP}/vision_bundle.mjs`);
   const fileset = await vision.FilesetResolver.forVisionTasks(`${CONFIG.MP}/wasm`);
-  const opts = d => ({ baseOptions:{ modelAssetPath: CONFIG.MODEL, delegate: d }, runningMode:'VIDEO', numHands:1,
+  let buf = null;
+  try { buf = await fetchWithProgress(CONFIG.MODEL, p => AR.mpProgress = p); } catch (e) { console.warn('model fetch', e); }
+  const src = () => buf ? { modelAssetBuffer: buf.slice() } : { modelAssetPath: CONFIG.MODEL };
+  const opts = d => ({ baseOptions:{ ...src(), delegate: d }, runningMode:'VIDEO', numHands:1,
     minHandDetectionConfidence:.5, minHandPresenceConfidence:.5, minTrackingConfidence:.4 });
   try { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('GPU')); AR.delegate = 'GPU'; }
   catch { AR.landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts('CPU')); AR.delegate = 'CPU'; }
@@ -819,11 +984,11 @@ function enterTouchMode(msg, canRetry){
   $('touchMode').hidden = true; $('flip').hidden = true; $('camSel').hidden = true; $('lm').hidden = true;
   setStatus(IS_MOBILE ? 'Tryb dotykowy' : 'Tryb myszy', true);
   if (!IS_MOBILE && !msg) msg = 'Przytrzymaj przycisk myszy i kręć kursorem dookoła ciastka.';
-  setInstr('Kręć palcem', msg || 'Kręć palcem dookoła ciastka, aby je odkręcić.');
-  AR.target = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
-  AR.lean = null;
+  setInstr(IS_MOBILE ? 'Kręć palcem' : 'Kręć myszą', msg || 'Kręć palcem dookoła ciastka, aby je odkręcić.');
+  AR.target = cookieBase();
+  AR.lean = null; AR.touched = false;
 }
-$('touchMode').onclick = () => enterTouchMode(undefined, true);
+$('touchMode').onclick = () => { Sound.ensure(); enterTouchMode(undefined, true); };
 $('retryCam').onclick = async () => {
   $('retryCam').hidden = true; AR.mode = 'loading';
   showLoader('Łączę z kamerą…');
@@ -843,8 +1008,7 @@ function initScene(){
     AR.renderer = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
     AR.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     AR.scene = new T.Scene();
-    AR.scene.add(new T.HemisphereLight(0xffffff, 0x334488, 1.5));
-    const d = new T.DirectionalLight(0xffffff, 2.4); d.position.set(.4, 1, 1.2); AR.scene.add(d);
+    stageLights(T, AR.renderer, AR.scene);
     AR.cookie = makeCookie(T, AR.renderer); AR.scene.add(AR.cookie.group);
     cv.addEventListener('webglcontextlost', e => e.preventDefault());
     cv.addEventListener('webglcontextrestored', () => AR.cookie.textures.forEach(t => t.needsUpdate = true));
@@ -861,7 +1025,7 @@ function initScene(){
   resize();
   const ck = AR.cookie; ck.topPivot.position.y = .26; ck.topPivot.rotation.set(0,0,0); ck.bottom.rotation.set(0,0,0);
   AR.crumbs.t = -1; AR.crumbs.pts.material.opacity = 0;
-  AR.target = AR.cur = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.22 };
+  AR.target = { ...cookieBase(), s: cookieBase().s*.85 };
   AR.cur = { ...AR.target };
 }
 function resize(){
@@ -880,6 +1044,16 @@ function toScreen(nx, ny){
   if (AR.mirror) x = AR.W - x;
   return { x, y };
 }
+/* środek i rozmiar ciastka: na komputerze ograniczony wysokością, żeby nie wchodził na interfejs */
+function updateCoach(prog){
+  const c = $('coach'), now = performance.now();
+  const on = AR.running && !AR.done && prog < .04 && (AR.mode === 'touch' ? !AR.touched : AR.mode === 'camera' && (!AR.seenHand || now - AR.lastHandAt > 1500));
+  if (on !== c.classList.contains('on')) c.classList.toggle('on', on);
+  const finger = AR.mode === 'touch';
+  if (finger !== c.classList.contains('finger')) c.classList.toggle('finger', finger);
+  if (on) { const d = Math.round((AR.cur.s || 100) * (finger ? 2.7 : 1.6)); if (c._d !== d) { c._d = d; c.style.width = c.style.height = d + 'px'; c.style.margin = `${-d/2}px 0 0 ${-d/2}px`; } }
+}
+function cookieBase(){ return { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W*0.27, AR.H*0.19) }; }
 const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
 
 /* akumulacja obrotu (tryb dotykowy) */
@@ -957,7 +1131,7 @@ function processHand(res, now){
   const w = pts[0], m9 = p(9);
   const handPx = Math.hypot(m9.x - w.x, m9.y - w.y);
   if (handPx < 35) { if (TEST.landmarks) clearLandmarks(); return; }        // za mała / fałszywa dłoń
-  AR.lastHandAt = now;
+  AR.lastHandAt = now; AR.seenHand = true;
   if (!AR.handSince) AR.handSince = now;
   const palm = pts.reduce((a, q) => ({ x: a.x + q.x/pts.length, y: a.y + q.y/pts.length }), { x:0, y:0 });
   const speed = AR.prevPalm ? Math.hypot(palm.x - AR.prevPalm.x, palm.y - AR.prevPalm.y) / handPx : 0;
@@ -999,7 +1173,7 @@ function clearLandmarks(){ const cv = $('lm'); cv.getContext('2d').clearRect(0,0
 
 function bindTouch(cv){
   let active = false;
-  cv.addEventListener('pointerdown', e => { if (AR.mode !== 'touch' || AR.done) return; active = true; AR.prevAngle = null; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointerdown', e => { if (AR.mode !== 'touch' || AR.done) return; active = true; AR.touched = true; Sound.ensure(); AR.prevAngle = null; cv.setPointerCapture(e.pointerId); });
   cv.addEventListener('pointermove', e => {
     if (!active || AR.mode !== 'touch' || AR.done) return;
     accumulate(Math.atan2(e.clientY - AR.cur.y, e.clientX - AR.cur.x), 1.2);
@@ -1024,12 +1198,18 @@ function loop(now, token){
   }
   const target = (AR.mode === 'touch' ? CONFIG.TOUCH_TARGET_DEG : CONFIG.TWIST_TARGET_DEG) * Math.PI/180;
   const prog = Math.min(1, Math.abs(AR.net)/target);
-  if (!AR.done) { setProgress(prog); if (prog >= .5 && !AR.halfBuzz) { AR.halfBuzz = true; vibrate(15); } }
+  if (!AR.done) {
+    setProgress(prog);
+    if (prog >= .5 && !AR.halfBuzz) { AR.halfBuzz = true; vibrate(15); }
+    const tick = Math.floor(prog*14);                        // „zapadka”: 14 kliknięć do odkręcenia
+    if (tick > AR.lastTick) { AR.lastTick = tick; Sound.click(1 + prog*.7); }
+  }
+  updateCoach(prog);
   if (!AR.done && prog >= 1) win();
 
   // pozycja ciastka (wygładzona)
   if (AR.mode === 'camera') {
-    const base = { x: AR.W/2, y: AR.H*0.42, s: Math.min(AR.W, AR.H)*0.26 };
+    const base = cookieBase();
     const l = AR.lean;
     AR.target = l ? { x: base.x + (l.x - base.x)*.06, y: base.y + (l.y - base.y)*.06, s: base.s*1.04 } : base;
   }
@@ -1070,7 +1250,7 @@ function loop(now, token){
 
 async function win(){
   AR.done = true; AR.doneAt = performance.now();
-  setProgress(1); vibrate([30,40,60]);
+  setProgress(1); vibrate([30,40,60]); Sound.win(); $('coach').classList.remove('on');
   AR.crumbs.t = 0; AR.crumbs.pts.material.opacity = 1;
   setInstr('Odkręcone!', 'Sprawdzam, czy jest jeszcze paczka dla Ciebie…');
   const f = $('flash'); f.style.opacity = .55; setTimeout(() => f.style.opacity = 0, 180);
@@ -1149,6 +1329,7 @@ $('optNoLimit').onchange = e => { TEST.noLimit = e.target.checked; saveTest(); }
 $('optLm').onchange = e => { TEST.landmarks = e.target.checked; saveTest(); if (AR.mode === 'camera') { $('lm').hidden = !TEST.landmarks; clearLandmarks(); } };
 if (location.hash === '#reset') { fullReset(); history.replaceState(null, '', location.pathname + location.search); setTimeout(() => toast('Zresetowano test'), 300); }
 if (!IS_MOBILE) $('touchMode').textContent = 'Nie widzi dłoni? Graj myszą';
+document.documentElement.classList.toggle('desk', !IS_MOBILE);
 $('dmZero').onclick = () => { CodeService.demo.setFree(0); afterDemo(); toast('Pula wyczerpana'); };
 $('dmThree').onclick = () => { CodeService.demo.setFree(3); afterDemo(); toast('Zostały 3 kody'); };
 $('dmExpire').onclick = () => { CodeService.demo.expireMine(); afterDemo(); toast('Twój kod wygasł'); if (!$('success').hidden) enterStart(); };
