@@ -1,0 +1,45 @@
+<!doctype html>
+<!--
+  Zgarnij Oreo · WebAR v2 (Oreo × Lisek)
+  ─────────────────────────────────────────────────────────────────────────────
+  Pakiety (npm):
+    npm i react@18 react-dom@18 three@0.169 @react-three/fiber@8 @react-three/drei@9 \
+          @react-three/postprocessing@2 postprocessing@6 framer-motion@11 zustand@4 \
+          @mediapipe/tasks-vision@0.10.14 clsx tailwind-merge@2 lucide-react
+    npm i -D vite@5 @vitejs/plugin-react@4 typescript@5 @types/react@18 @types/react-dom@18 \
+          @types/three tailwindcss@3 postcss autoprefixer vite-plugin-singlefile@2
+
+  shadcn / Skiper UI:
+    npx shadcn@latest init                  # components.json jest już w repo (style new-york, alias @/ui)
+    npx shadcn@latest add @skiper-ui/<nazwa> # komponenty Skiper UI z rejestru, np. @skiper-ui/skiper40
+    (zależności Skiper UI: framer-motion, clsx, tailwind-merge, lucide-react – w liście powyżej)
+
+  Świadomie BEZ @react-three/xr: gra wymaga klatek kamery dla śledzenia dłoni (MediaPipe).
+  Safari na iOS nie ma WebXR, a w sesji immersive-ar na Androidzie strona nie dostaje
+  obrazu kamery. Dlatego: kamera jako tekstura tła + MediaPipe + paralaksa z żyroskopu.
+
+  Build: npm run build -> dist/index.html (jeden plik, działa jako artefakt i na GitHub Pages)
+-->
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="claude:viewport-fit-sides" content="cover" />
+    <meta name="theme-color" content="#04060d" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <meta name="page-type" content="software" />
+    <meta name="site-kind" content="gaming" />
+    <title>Zgarnij Oreo AR</title>
+    <meta name="description" content="Odkręć ciastko Oreo gestem dłoni w AR i odbierz darmowe opakowanie w aplikacji Lisek. Codziennie 300 paczek." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304060d'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%232a1812'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%2374503b' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2374503b'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Ta strona wymaga JavaScriptu.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
